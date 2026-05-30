@@ -31,12 +31,23 @@ config.set_main_option("sqlalchemy.url", sync_url)
 target_metadata = Base.metadata
 
 
+def render_item(type_, obj, autogen_context):
+    """Render fastapi-users-db-sqlalchemy's custom GUID as standard sa.UUID.
+    On Postgres they map to the same underlying column type — but rendering
+    as sa.UUID avoids needing to import fastapi_users_db_sqlalchemy into
+    every migration file."""
+    if type_ == "type" and obj.__class__.__module__ == "fastapi_users_db_sqlalchemy.generics":
+        return "sa.UUID(as_uuid=True)"
+    return False  # fall through to Alembic's default rendering
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=sync_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -49,7 +60,11 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_item=render_item,
+        )
         with context.begin_transaction():
             context.run_migrations()
 
