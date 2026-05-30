@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* ifasto design tokens — shared with the marketing site (ifasto.com).
+   Single warm light theme, no dark-mode auto-switch. */
+@theme {
+  --color-ifasto-bg: #FAFAF8;
+  --color-ifasto-text: #0A1628;
+  --color-ifasto-amber: #D4A053;
+  --color-ifasto-forest: #2D4A3E;
+  --color-ifasto-secondary: #5C5C5C;
+  --color-ifasto-border: #E8E4DC;
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+html, body {
+  background: var(--color-ifasto-bg);
+  color: var(--color-ifasto-text);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html { scroll-behavior: smooth; }
+
+::selection {
+  background: rgba(212, 160, 83, 0.25);
+  color: var(--color-ifasto-text);
+}
