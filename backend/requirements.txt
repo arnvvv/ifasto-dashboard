@@ -8,7 +8,8 @@ gunicorn>=23.0,<24.0
 
 # Database
 sqlalchemy[asyncio]>=2.0,<2.1
-asyncpg>=0.29,<0.32
+asyncpg>=0.29,<0.32           # async driver for the app
+psycopg2-binary>=2.9,<3.0     # sync driver for Alembic
 alembic>=1.13,<2.0
 
 # Auth
