@@ -13,6 +13,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    String,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -52,6 +53,10 @@ class QueueEntry(Base):
     entry_type: Mapped[QueueEntryType] = mapped_column(
         Enum(QueueEntryType), default=QueueEntryType.regular, nullable=False
     )
+    # Optional contact for the seat-next host (call out by name, or SMS later).
+    party_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

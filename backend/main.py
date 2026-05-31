@@ -3,6 +3,8 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import queue as queue_api
+from app.api import websockets as ws_api
 from app.auth.users import auth_backend, current_active_user, fastapi_users
 from app.models.user import User
 from app.schemas.user import UserRead, UserUpdate
@@ -56,3 +58,7 @@ app.include_router(
 
 # NOTE: public registration is intentionally NOT exposed. Owner accounts are
 # minted via the admin CLI during the pilot phase (per the build spec).
+
+# Queue management — REST + WebSocket.
+app.include_router(queue_api.router, prefix="/api/queue", tags=["queue"])
+app.include_router(ws_api.router, prefix="/api", tags=["queue-ws"])
