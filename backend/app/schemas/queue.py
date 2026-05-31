@@ -40,3 +40,7 @@ class QueueState(BaseModel):
     premium_waiting: int
     total_waiting: int
     avg_wait_minutes: float | None = None
+
+    # "Today" = JST midnight → now. Counts/sums of seated parties only.
+    seated_today: int = 0
+    premium_revenue_today: int = 0  # in venue currency minor units (yen)

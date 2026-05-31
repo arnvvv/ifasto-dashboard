@@ -8,10 +8,10 @@ broadcaster so connected live-ops boards update in real time.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.broadcast import broadcaster
@@ -23,12 +23,71 @@ from app.schemas.queue import QueueEntryCreate, QueueEntryRead, QueueState
 
 router = APIRouter()
 
+# Pilot is Tokyo-only; Japan has no DST, fixed +09:00. Per-restaurant tz when
+# we expand outside Japan.
+JST = timezone(timedelta(hours=9))
 
-async def _broadcast(restaurant_id: uuid.UUID, event_type: str, entry: QueueEntry) -> None:
-    """Fan an event out to all connected live-ops clients for this restaurant."""
+
+def _today_start_utc() -> datetime:
+    """JST midnight today, expressed in UTC for DB comparison."""
+    jst_now = datetime.now(JST)
+    jst_midnight = datetime.combine(jst_now.date(), time.min, tzinfo=JST)
+    return jst_midnight.astimezone(timezone.utc)
+
+
+async def compute_queue_state(
+    session: AsyncSession, restaurant_id: uuid.UUID
+) -> QueueState:
+    """Header snapshot — waiting counts + today's seated/revenue totals."""
+    waiting_stmt = select(QueueEntry).where(
+        QueueEntry.restaurant_id == restaurant_id,
+        QueueEntry.status == QueueEntryStatus.waiting,
+    )
+    waiting = list((await session.execute(waiting_stmt)).scalars().all())
+
+    regular = sum(1 for e in waiting if e.entry_type == QueueEntryType.regular)
+    premium = sum(1 for e in waiting if e.entry_type == QueueEntryType.premium)
+
+    now = datetime.now(timezone.utc)
+    waits = [
+        max(0.0, (now - e.joined_at.replace(tzinfo=e.joined_at.tzinfo or timezone.utc)).total_seconds() / 60.0)
+        for e in waiting
+    ]
+    avg_wait = sum(waits) / len(waits) if waits else None
+
+    today_start = _today_start_utc()
+    today_stmt = select(
+        func.count(QueueEntry.id),
+        func.coalesce(func.sum(QueueEntry.skip_price), 0),
+    ).where(
+        QueueEntry.restaurant_id == restaurant_id,
+        QueueEntry.status == QueueEntryStatus.seated,
+        QueueEntry.seated_at >= today_start,
+    )
+    seated_today, premium_revenue_today = (await session.execute(today_stmt)).one()
+
+    return QueueState(
+        regular_waiting=regular,
+        premium_waiting=premium,
+        total_waiting=regular + premium,
+        avg_wait_minutes=round(avg_wait, 1) if avg_wait is not None else None,
+        seated_today=int(seated_today or 0),
+        premium_revenue_today=int(premium_revenue_today or 0),
+    )
+
+
+async def _broadcast(
+    session: AsyncSession,
+    restaurant_id: uuid.UUID,
+    event_type: str,
+    entry: QueueEntry,
+) -> None:
+    """Fan an event + a fresh state snapshot out to all live-ops clients."""
+    state = await compute_queue_state(session, restaurant_id)
     payload = {
         "event": event_type,
         "entry": QueueEntryRead.model_validate(entry).model_dump(mode="json"),
+        "state": state.model_dump(mode="json"),
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     await broadcaster.broadcast(restaurant_id, payload)
@@ -62,32 +121,7 @@ async def queue_state(
     session: AsyncSession = Depends(get_session),
 ) -> QueueState:
     """Header summary for the live-ops view."""
-    stmt = select(QueueEntry).where(
-        QueueEntry.restaurant_id == user.restaurant_id,
-        QueueEntry.status == QueueEntryStatus.waiting,
-    )
-    result = await session.execute(stmt)
-    entries = list(result.scalars().all())
-
-    regular = sum(1 for e in entries if e.entry_type == QueueEntryType.regular)
-    premium = sum(1 for e in entries if e.entry_type == QueueEntryType.premium)
-
-    # Naive wait estimate: avg time the currently-waiting parties have been
-    # waiting so far. (A real implementation calls the L1 model; v1 keeps it
-    # simple — better than nothing on the header.)
-    now = datetime.now(timezone.utc)
-    waits = [
-        max(0.0, (now - e.joined_at.replace(tzinfo=e.joined_at.tzinfo or timezone.utc)).total_seconds() / 60.0)
-        for e in entries
-    ]
-    avg_wait = sum(waits) / len(waits) if waits else None
-
-    return QueueState(
-        regular_waiting=regular,
-        premium_waiting=premium,
-        total_waiting=regular + premium,
-        avg_wait_minutes=round(avg_wait, 1) if avg_wait is not None else None,
-    )
+    return await compute_queue_state(session, user.restaurant_id)
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +147,7 @@ async def add_to_queue(
     session.add(entry)
     await session.commit()
     await session.refresh(entry)
-    await _broadcast(user.restaurant_id, "joined", entry)
+    await _broadcast(session, user.restaurant_id, "joined", entry)
     return entry
 
 
@@ -133,7 +167,7 @@ async def seat_entry(
     entry.seated_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(entry)
-    await _broadcast(user.restaurant_id, "seated", entry)
+    await _broadcast(session, user.restaurant_id, "seated", entry)
     return entry
 
 
@@ -152,7 +186,7 @@ async def walk_away(
     entry.status = QueueEntryStatus.walked_away
     await session.commit()
     await session.refresh(entry)
-    await _broadcast(user.restaurant_id, "walked_away", entry)
+    await _broadcast(session, user.restaurant_id, "walked_away", entry)
     return entry
 
 

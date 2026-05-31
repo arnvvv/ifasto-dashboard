@@ -24,6 +24,8 @@ export interface QueueState {
   premium_waiting: number;
   total_waiting: number;
   avg_wait_minutes: number | null;
+  seated_today: number;
+  premium_revenue_today: number;  // yen (integer minor units)
 }
 
 export interface QueueEntryCreate {

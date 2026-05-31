@@ -104,7 +104,7 @@ export default function OpsPage() {
         </div>
       </header>
 
-      <section className="px-6 py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="px-6 py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Stat label="Waiting" value={state?.total_waiting ?? entries.length} />
         <Stat label="Regular" value={state?.regular_waiting ?? regular.length} />
         <Stat label="Premium" value={state?.premium_waiting ?? premium.length} />
@@ -115,6 +115,12 @@ export default function OpsPage() {
               ? `${Math.round(state.avg_wait_minutes)} min`
               : "—"
           }
+        />
+        <Stat label="Seated today" value={state?.seated_today ?? 0} />
+        <Stat
+          label="Premium ¥ today"
+          value={formatYen(state?.premium_revenue_today ?? 0)}
+          accent
         />
       </section>
 
@@ -201,15 +207,33 @@ export default function OpsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+}) {
   return (
     <div>
       <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary">
         {label}
       </p>
-      <p className="font-display text-2xl mt-0.5">{value}</p>
+      <p
+        className={`font-display text-2xl mt-0.5 ${
+          accent ? "text-ifasto-amber" : ""
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
+}
+
+function formatYen(yen: number): string {
+  return `¥${yen.toLocaleString()}`;
 }
 
 interface QueueColumnProps {
