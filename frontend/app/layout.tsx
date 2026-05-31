@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Inter, JetBrains_Mono } from "next/font/google";
+import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
 const display = Playfair_Display({
@@ -36,7 +37,7 @@ export default function RootLayout({
       className={`${display.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-ifasto-bg text-ifasto-text">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
