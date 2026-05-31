@@ -6,7 +6,7 @@ import enum
 import uuid
 from typing import TYPE_CHECKING
 
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
