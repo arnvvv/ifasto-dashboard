@@ -3,6 +3,7 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import pricing as pricing_api
 from app.api import queue as queue_api
 from app.api import websockets as ws_api
 from app.auth.users import auth_backend, current_active_user, fastapi_users
@@ -62,3 +63,7 @@ app.include_router(
 # Queue management — REST + WebSocket.
 app.include_router(queue_api.router, prefix="/api/queue", tags=["queue"])
 app.include_router(ws_api.router, prefix="/api", tags=["queue-ws"])
+
+# Pricing bridge — server-side proxy to the ML pricing engine, gated on
+# VenueSettings (paused + per-category caps).
+app.include_router(pricing_api.router, prefix="/api/pricing", tags=["pricing"])

@@ -14,6 +14,7 @@ import {
   queueApi,
 } from "@/lib/queue";
 import { useQueue } from "@/lib/useQueue";
+import LivePriceTile from "./LivePriceTile";
 
 export default function OpsPage() {
   const router = useRouter();
@@ -104,7 +105,7 @@ export default function OpsPage() {
         </div>
       </header>
 
-      <section className="px-6 py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <section className="px-6 py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         <Stat label="Waiting" value={state?.total_waiting ?? entries.length} />
         <Stat label="Regular" value={state?.regular_waiting ?? regular.length} />
         <Stat label="Premium" value={state?.premium_waiting ?? premium.length} />
@@ -116,6 +117,7 @@ export default function OpsPage() {
               : "—"
           }
         />
+        {token && <LivePriceTile token={token} partySize={2} active />}
         <Stat label="Seated today" value={state?.seated_today ?? 0} />
         <Stat
           label="Premium ¥ today"
