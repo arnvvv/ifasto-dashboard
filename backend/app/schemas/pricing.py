@@ -5,15 +5,21 @@ venue_config from the operator's own Restaurant + VenueSettings."""
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class PriceQuoteRequest(BaseModel):
     party_size: int = Field(ge=1, le=20)
-    service_id: Optional[str] = None
-    session_id: Optional[str] = None  # pass to lock the price for 5 min
+    service_id: Optional[str] = Field(default=None, max_length=128)
+    # Locks the price for 5 min. max_length matches the String(64) column in
+    # price_quote_logs — an oversized value would 500 the whole request at
+    # commit time otherwise.
+    session_id: Optional[str] = Field(default=None, max_length=64)
+    # 'tile_poll' = the ops-header tile's periodic refresh; 'offer' = a real
+    # operator-initiated quote. Conversion analysis filters on source='offer'.
+    source: Literal["offer", "tile_poll"] = "offer"
 
 
 class PriceQuote(BaseModel):

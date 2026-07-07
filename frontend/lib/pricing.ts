@@ -33,6 +33,10 @@ export interface PriceQuoteRequest {
   party_size: number;
   service_id?: string | null;
   session_id?: string | null;
+  // 'tile_poll' = the header tile's periodic refresh; 'offer' = a real
+  // operator-initiated quote. Backend logs both but conversion analysis
+  // only counts 'offer'.
+  source?: "offer" | "tile_poll";
 }
 
 export interface PriceUnavailable {

@@ -18,8 +18,15 @@ from app.api.broadcast import broadcaster
 from app.auth.users import current_active_user
 from app.database import get_session
 from app.models.operations import QueueEntry, QueueEntryStatus, QueueEntryType
+from app.models.restaurant import Restaurant
 from app.models.user import User
 from app.schemas.queue import QueueEntryCreate, QueueEntryRead, QueueState
+from app.services.engine_payload import (
+    build_engine_payload,
+    get_venue_settings,
+    predict_wait_best_effort,
+    queue_pressure,
+)
 
 router = APIRouter()
 
@@ -134,6 +141,37 @@ async def add_to_queue(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_session),
 ) -> QueueEntry:
+    # --- Join-time snapshot, computed BEFORE the new entry exists so the
+    # party doesn't count itself (and before session.add so autoflush can't
+    # sneak it into the waiting query). Every field here is a training
+    # feature that cannot be reconstructed later.
+    pre_state = await compute_queue_state(session, user.restaurant_id)
+    restaurant = await session.get(Restaurant, user.restaurant_id)
+
+    pressure_at_join: float | None = None
+    predicted_wait: float | None = None
+    prediction_request_id: str | None = None
+    if restaurant is not None:
+        pressure_at_join = queue_pressure(
+            pre_state.regular_waiting, pre_state.premium_waiting, restaurant.seat_count
+        )
+        vs = await get_venue_settings(session, user.restaurant_id)
+        venue_config, queue_state = build_engine_payload(
+            restaurant,
+            vs,
+            pre_state.regular_waiting,
+            pre_state.premium_waiting,
+            body.party_size,
+        )
+        # Release the read transaction BEFORE the HTTP call — a slow engine
+        # must not hold this connection idle-in-transaction for up to 2s.
+        await session.commit()
+        # Best-effort L1 prediction (2s timeout, NULL on failure) — engine
+        # downtime must never block a join.
+        predicted_wait, prediction_request_id = await predict_wait_best_effort(
+            venue_config, queue_state
+        )
+
     entry = QueueEntry(
         restaurant_id=user.restaurant_id,
         party_size=body.party_size,
@@ -143,6 +181,11 @@ async def add_to_queue(
         notes=body.notes,
         skip_price=body.skip_price,
         status=QueueEntryStatus.waiting,
+        queue_ahead_regular=pre_state.regular_waiting,
+        queue_ahead_premium=pre_state.premium_waiting,
+        queue_pressure_at_join=pressure_at_join,
+        predicted_wait_at_join=predicted_wait,
+        prediction_request_id=prediction_request_id,
     )
     session.add(entry)
     await session.commit()
@@ -184,6 +227,7 @@ async def walk_away(
             detail=f"Entry is already {entry.status.value}, cannot mark walked-away.",
         )
     entry.status = QueueEntryStatus.walked_away
+    entry.walked_away_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(entry)
     await _broadcast(session, user.restaurant_id, "walked_away", entry)

@@ -34,7 +34,12 @@ export default function LivePriceTile({
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchQuote = useCallback(async () => {
-    const r = await pricingApi.quote(token, { party_size: partySize });
+    // source: 'tile_poll' keeps these periodic refreshes out of the
+    // conversion denominator in the backend's quote log.
+    const r = await pricingApi.quote(token, {
+      party_size: partySize,
+      source: "tile_poll",
+    });
     setResp(r);
     setLoading(false);
   }, [token, partySize]);

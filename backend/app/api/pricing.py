@@ -10,24 +10,22 @@ operator guardrails BEFORE forwarding:
   - refuses (409) when the per-service large-party cap is already met for a
     party that exceeds max_party_size_eligible
 
+Every call — refusals included — writes a PriceQuoteLog row. That log is the
+conversion dataset: price shown vs price accepted at a known queue state.
+The payload itself comes from app/services/engine_payload.py, shared with the
+queue API's join-time snapshot so quote features and training features can't
+drift apart.
+
 Mirrors the conventions in app/api/queue.py:
   - Depends(current_active_user) + get_session on every route
   - every query filters on user.restaurant_id
-  - no state change here, so no WS broadcast
-
-Known follow-ups (post-this-PR):
-  - tourist_density_pct is hard-coded to 0.7 because there is no column for it
-    yet on Restaurant/VenueSettings. When we add one, swap it in here.
-  - The pricing engine keeps its OWN Redis-backed premium-share counter,
-    populated by /v2/event. The dashboard doesn't fire /v2/event yet, so the
-    engine's pressure multiplier may not reflect the dashboard's queue. The
-    engine still returns a usable quote (anchored to avg check); pressure
-    accuracy is the follow-up.
+  - no state change visible to other clients, so no WS broadcast
 """
 
 from __future__ import annotations
 
 import uuid
+from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -39,34 +37,29 @@ from app.auth.users import current_active_user
 from app.config import settings
 from app.database import get_session
 from app.models.operations import (
+    PriceQuoteLog,
     QueueEntry,
     QueueEntryStatus,
     QueueEntryType,
 )
-from app.models.restaurant import Restaurant, VenueSettings
+from app.models.restaurant import Restaurant
 from app.models.user import User
 from app.schemas.pricing import PriceQuote, PriceQuoteRequest
+from app.schemas.queue import QueueState
+from app.services.engine_payload import (
+    QUOTE_TIMEOUT_S,
+    build_engine_payload,
+    get_venue_settings,
+)
 
 router = APIRouter()
 
-# Until tourist density becomes a per-venue column, all pilot venues are
-# Tokyo and inherit a single sensible default.
-_DEFAULT_TOURIST_DENSITY = 0.7
 
 # Engine's category split: parties > max_party_size_eligible are "large".
 # Mirroring it locally so we can short-circuit the per-category cap before
 # paying the round-trip to the engine.
 def _category(party_size: int, max_eligible: int) -> str:
     return "small" if party_size <= max_eligible else "large"
-
-
-async def _get_settings(session: AsyncSession, restaurant_id: uuid.UUID) -> VenueSettings:
-    vs = await session.get(VenueSettings, restaurant_id)
-    if vs is None:
-        # No row yet → fall back to model defaults so a freshly-minted venue
-        # still quotes. (Defaults match the column server-defaults.)
-        vs = VenueSettings(restaurant_id=restaurant_id)
-    return vs
 
 
 async def _count_premium_in_category(
@@ -86,6 +79,36 @@ async def _count_premium_in_category(
     return sum(1 for e in rows if _category(e.party_size, max_eligible) == category)
 
 
+async def _log_quote(
+    session: AsyncSession,
+    restaurant_id: uuid.UUID,
+    body: PriceQuoteRequest,
+    outcome: str,
+    qstate: QueueState | None,
+    result: dict | None = None,
+    request_id: str | None = None,
+) -> None:
+    """Persist one PriceQuoteLog row. Committed immediately so a subsequent
+    HTTPException (whose handler rolls the session back) can't erase it."""
+    r = result or {}
+    session.add(PriceQuoteLog(
+        restaurant_id=restaurant_id,
+        source=body.source,
+        party_size=body.party_size,
+        outcome=outcome,
+        price_minor=r.get("price_minor"),
+        currency=r.get("currency"),
+        predicted_wait_mins=r.get("predicted_wait_mins"),
+        premium_share_pct=r.get("premium_share_pct"),
+        multipliers=r.get("multipliers"),
+        queue_regular=qstate.regular_waiting if qstate else 0,
+        queue_premium=qstate.premium_waiting if qstate else 0,
+        session_id=r.get("session_id") or body.session_id,
+        request_id=request_id,
+    ))
+    await session.commit()
+
+
 @router.post("/quote", response_model=PriceQuote)
 async def quote_price(
     body: PriceQuoteRequest,
@@ -98,10 +121,14 @@ async def quote_price(
     if restaurant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Restaurant not found")
 
-    vs = await _get_settings(session, restaurant_id)
+    vs = await get_venue_settings(session, restaurant_id)
+
+    # Live queue state up front so refusal logs still carry queue context.
+    qstate = await compute_queue_state(session, restaurant_id)
 
     # ---- Operator guardrails, enforced BEFORE we forward to the engine ----
     if vs.premium_paused:
+        await _log_quote(session, restaurant_id, body, "premium_paused", qstate)
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             detail={
@@ -116,6 +143,7 @@ async def quote_price(
             session, restaurant_id, "large", vs.max_party_size_eligible
         )
         if in_cat >= vs.large_party_cap_per_service:
+            await _log_quote(session, restaurant_id, body, "large_party_cap_reached", qstate)
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 detail={
@@ -124,52 +152,41 @@ async def quote_price(
                 },
             )
 
-    # ---- Live queue state drives the Tokyo L1 wait predictor ----
-    qstate = await compute_queue_state(session, restaurant_id)
-    total_queue = qstate.regular_waiting + qstate.premium_waiting
+    venue_config, queue_state = build_engine_payload(
+        restaurant,
+        vs,
+        qstate.regular_waiting,
+        qstate.premium_waiting,
+        body.party_size,
+        service_id=body.service_id,
+    )
 
-    # venue_config carries both pricing-engine anchors AND wait-predictor
-    # structural features. The engine schema is documented in
-    # pricing_engine._validate_venue_config; the predictor schema in
-    # ml_server.predict_tokyo_wait.
-    venue_config: dict = {
-        # Identity + currency
-        "venue_id": str(restaurant_id),
-        "service_id": body.service_id or f"{restaurant_id}:default",
-        "currency": restaurant.currency,
-        "minor_units": 0 if restaurant.currency == "JPY" else 2,
-        # Pricing anchors — engine derives base/floor/ceiling from these:
-        "avg_check_size_minor": restaurant.avg_check_size,
-        "tourist_density_pct": _DEFAULT_TOURIST_DENSITY,
-        "max_premium_cap_minor": vs.price_ceiling,
-        "max_premium_share": vs.max_premium_share,
-        # Wait predictor structural features (rest have engine-side defaults):
-        "capacity": restaurant.seat_count,
-        "avg_dining_min": restaurant.avg_turn_minutes,
-    }
-    queue_state: dict = {
-        "queue_length": total_queue,
-        "current_occupancy_pct": min(1.0, total_queue / max(1, restaurant.seat_count)),
-        "party_size": body.party_size,
-    }
-
+    request_id = str(uuid4())
     payload: dict = {
         "venue_config": venue_config,
         "queue_state": queue_state,
         "party_size": body.party_size,
+        "source": body.source,
+        "request_id": request_id,
     }
     if body.session_id:
         payload["session_id"] = body.session_id
 
+    # Release the read transaction BEFORE the HTTP call — a slow engine must
+    # not hold this connection idle-in-transaction for up to 4s.
+    await session.commit()
+
     url = settings.pricing_engine_url.rstrip("/") + "/v2/price"
     try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
+        async with httpx.AsyncClient(timeout=QUOTE_TIMEOUT_S) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             result = resp.json()
     except httpx.HTTPError as exc:
         # Engine down / slow → don't 500 the dashboard. Surface a clean
         # "no quote available" the operator UI can render as a dash.
+        await _log_quote(session, restaurant_id, body, "engine_unavailable", qstate,
+                         request_id=request_id)
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
@@ -178,8 +195,28 @@ async def quote_price(
             },
         ) from exc
 
+    # Off-hours the L1 wait is a guard sentinel, not a prediction — a price
+    # computed from it would be systematically wrong AND pollute the
+    # conversion dataset as a legitimate quote. The public marketing demo
+    # keeps working (it calls the engine directly and ignores this flag).
+    if result.pop("out_of_service_hours", False):
+        await _log_quote(session, restaurant_id, body, "out_of_service_hours",
+                         qstate, result, request_id=request_id)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "out_of_service_hours",
+                "message": "Outside service hours (11:00-23:00 JST); no live quote.",
+            },
+        )
+
     # The engine itself may decline (e.g. its own per-category hard cap).
     if result.get("status") != "ok":
+        await _log_quote(
+            session, restaurant_id, body,
+            result.get("status", "engine_declined"), qstate, result,
+            request_id=request_id,
+        )
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             detail={
@@ -188,4 +225,6 @@ async def quote_price(
             },
         )
 
+    await _log_quote(session, restaurant_id, body, "ok", qstate, result,
+                     request_id=request_id)
     return PriceQuote(**result)

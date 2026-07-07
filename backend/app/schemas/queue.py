@@ -27,8 +27,10 @@ class QueueEntryRead(BaseModel):
     notes: str | None
     joined_at: datetime
     seated_at: datetime | None
+    walked_away_at: datetime | None = None
     status: QueueEntryStatus
     skip_price: int | None
+    predicted_wait_at_join: float | None = None
 
     model_config = {"from_attributes": True}
 

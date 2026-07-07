@@ -15,8 +15,10 @@ export interface QueueEntry {
   notes: string | null;
   joined_at: string;
   seated_at: string | null;
+  walked_away_at?: string | null;
   status: QueueEntryStatus;
   skip_price: number | null;
+  predicted_wait_at_join?: number | null;
 }
 
 export interface QueueState {

@@ -11,12 +11,13 @@ from sqlalchemy import (
     Date,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Integer,
     String,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -61,14 +62,64 @@ class QueueEntry(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     seated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    walked_away_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[QueueEntryStatus] = mapped_column(
         Enum(QueueEntryStatus), default=QueueEntryStatus.waiting, nullable=False
     )
     skip_price: Mapped[int | None] = mapped_column(Integer, nullable=True)  # yen, if premium
 
+    # --- Join-time snapshot (training-data capture) ---
+    # State of the world the moment this party joined. Together with the
+    # outcome (seated_at - joined_at, or walked_away_at) each row becomes a
+    # complete (features, prediction, label) triple. Cannot be backfilled.
+    queue_ahead_regular: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    queue_ahead_premium: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Waiting parties / seat_count at join — queue-side load, NOT dining-room
+    # occupancy (the dashboard has no table state to know that).
+    queue_pressure_at_join: Mapped[float | None] = mapped_column(Float, nullable=True)
+    predicted_wait_at_join: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Echoed into the ML server's prediction JSONL — exact join key between
+    # this row and the logged feature vector that produced the prediction.
+    prediction_request_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
     restaurant: Mapped["Restaurant"] = relationship(back_populates="queue_entries")
     transaction: Mapped["Transaction | None"] = relationship(
         back_populates="queue_entry", uselist=False
+    )
+
+
+class PriceQuoteLog(Base):
+    """One row per /api/pricing/quote call, INCLUDING refusals.
+
+    This is the conversion dataset: joined against premium QueueEntries it
+    yields price-shown vs price-accepted at a known queue state, which is the
+    input to elasticity estimation. `source` separates the ops-header tile's
+    15s polling ('tile_poll') from real operator-initiated quotes ('offer')
+    so polls never pollute the conversion denominator."""
+
+    __tablename__ = "price_quote_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True
+    )
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="offer")
+    party_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    # "ok" | "premium_paused" | "large_party_cap_reached" | "engine_unavailable"
+    # | engine-declined statuses (e.g. "unavailable_hard_cap")
+    outcome: Mapped[str] = mapped_column(String(40), nullable=False)
+    price_minor: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    predicted_wait_mins: Mapped[float | None] = mapped_column(Float, nullable=True)
+    premium_share_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    multipliers: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    queue_regular: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    queue_premium: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Echoed into the ML server's prediction JSONL for exact log joins.
+    request_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
     )
 
 
