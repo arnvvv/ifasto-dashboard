@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import pricing as pricing_api
 from app.api import queue as queue_api
+from app.api import reports as reports_api
 from app.api import settings as settings_api
 from app.api import websockets as ws_api
 from app.auth.users import auth_backend, current_active_user, fastapi_users
@@ -71,3 +72,6 @@ app.include_router(pricing_api.router, prefix="/api/pricing", tags=["pricing"])
 
 # Venue settings — pause button + caps (PATCH is owner/manager only).
 app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
+
+# Reports — end-of-day summary + week-over-week trends.
+app.include_router(reports_api.router, prefix="/api/reports", tags=["reports"])

@@ -141,6 +141,12 @@ export default function OpsPage() {
               Caps
             </button>
           )}
+          <a
+            href="/ops/history"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+          >
+            History
+          </a>
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-mono ${
               connected ? "text-emerald-600" : "text-ifasto-secondary"

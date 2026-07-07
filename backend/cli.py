@@ -18,16 +18,24 @@ have them change it after first login.
 
 import argparse
 import asyncio
+import json
 import secrets
 import string
+import sys
+from datetime import timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
+from sqlalchemy import select
 
 from app.auth.users import UserManager
 from app.database import SessionLocal
+from app.models.operations import QueueEntry, QueueEntryStatus
 from app.models.restaurant import Restaurant, VenueSettings, VenueType
 from app.models.user import LanguagePref, User, UserRole
 from app.schemas.user import UserCreate
+
+JST = ZoneInfo("Asia/Tokyo")
 
 
 def _generate_password(length: int = 16) -> str:
@@ -83,6 +91,76 @@ async def create_owner(
         return password
 
 
+async def export_training_data(out_path: str | None, include_test: bool) -> int:
+    """Dump completed queue entries (seated or walked away) as JSONL training
+    rows: join-time snapshot features + outcome labels + venue structure.
+    Joins to the ML server's prediction JSONL via prediction_request_id.
+    Returns the row count."""
+    def _mins(later, earlier) -> float | None:
+        if later is None or earlier is None:
+            return None
+        a = later if later.tzinfo else later.replace(tzinfo=timezone.utc)
+        b = earlier if earlier.tzinfo else earlier.replace(tzinfo=timezone.utc)
+        return round((a - b).total_seconds() / 60.0, 2)
+
+    rows: list[dict] = []
+    async with SessionLocal() as session:
+        restaurants = {
+            r.id: r for r in (await session.execute(select(Restaurant))).scalars()
+        }
+        stmt = (
+            select(QueueEntry)
+            .where(QueueEntry.status.in_(
+                [QueueEntryStatus.seated, QueueEntryStatus.walked_away]
+            ))
+            .order_by(QueueEntry.joined_at.asc())
+        )
+        for e in (await session.execute(stmt)).scalars():
+            r = restaurants.get(e.restaurant_id)
+            if not include_test and e.party_name and "test" in e.party_name.lower():
+                continue
+            joined = e.joined_at if e.joined_at.tzinfo else e.joined_at.replace(tzinfo=timezone.utc)
+            joined_jst = joined.astimezone(JST)
+            rows.append({
+                "entry_id": str(e.id),
+                "restaurant_id": str(e.restaurant_id),
+                "status": e.status.value,
+                "party_size": e.party_size,
+                "entry_type": e.entry_type.value,
+                # Labels
+                "true_wait_mins": _mins(e.seated_at, e.joined_at),
+                "censored_wait_mins": _mins(e.walked_away_at, e.joined_at),
+                # Join-time snapshot features
+                "queue_ahead_regular": e.queue_ahead_regular,
+                "queue_ahead_premium": e.queue_ahead_premium,
+                "queue_pressure_at_join": e.queue_pressure_at_join,
+                "predicted_wait_at_join": e.predicted_wait_at_join,
+                "prediction_request_id": e.prediction_request_id,
+                # Money (premium)
+                "skip_price": e.skip_price,
+                "quoted_price": e.quoted_price,
+                "pricing_session_id": e.pricing_session_id,
+                # Time features (JST — what the model trains on)
+                "joined_at_utc": joined.isoformat(),
+                "joined_jst_date": joined_jst.date().isoformat(),
+                "joined_jst_hour": joined_jst.hour,
+                "joined_jst_dow": joined_jst.weekday(),
+                # Venue structure (for baseline computations downstream)
+                "restaurant_seat_count": r.seat_count if r else None,
+                "restaurant_avg_turn_minutes": r.avg_turn_minutes if r else None,
+                "restaurant_avg_check": r.avg_check_size if r else None,
+            })
+
+    out = open(out_path, "w") if out_path else sys.stdout
+    try:
+        for row in rows:
+            out.write(json.dumps(row) + "\n")
+    finally:
+        if out_path:
+            out.close()
+    return len(rows)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cli.py", description="ifasto admin CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -99,7 +177,23 @@ def main() -> None:
     )
     co.add_argument("--avg-check", type=int, required=True, help="Average per-person check, in yen")
 
+    ex = sub.add_parser(
+        "export-training-data",
+        help="Dump completed queue entries as JSONL training rows",
+    )
+    ex.add_argument("--out", default=None, help="Output path (default: stdout)")
+    ex.add_argument(
+        "--include-test",
+        action="store_true",
+        help="Keep rows whose party_name contains 'test' (excluded by default)",
+    )
+
     args = parser.parse_args()
+
+    if args.cmd == "export-training-data":
+        n = asyncio.run(export_training_data(args.out, args.include_test))
+        print(f"exported {n} rows" + (f" -> {args.out}" if args.out else ""), file=sys.stderr)
+        return
 
     if args.cmd == "create-owner":
         pw = asyncio.run(
