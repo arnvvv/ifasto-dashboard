@@ -129,5 +129,6 @@ async def predict_wait_best_effort(
                 return None, None
             return float(wait), request_id
     except Exception as e:
-        logger.warning(f"join-snapshot wait prediction failed (non-fatal): {e}")
+        # repr, not str — httpx.ReadTimeout stringifies to ''.
+        logger.warning(f"join-snapshot wait prediction failed (non-fatal): {e!r}")
         return None, None
