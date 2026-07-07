@@ -17,10 +17,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.broadcast import broadcaster
 from app.auth.users import current_active_user
 from app.database import get_session
-from app.models.operations import QueueEntry, QueueEntryStatus, QueueEntryType
+from app.models.operations import (
+    QueueEntry,
+    QueueEntryStatus,
+    QueueEntryType,
+    Transaction,
+)
 from app.models.restaurant import Restaurant
 from app.models.user import User
 from app.schemas.queue import QueueEntryCreate, QueueEntryRead, QueueState
+from app.services.engine_events import notify_engine
 from app.services.engine_payload import (
     build_engine_payload,
     get_venue_settings,
@@ -186,10 +192,21 @@ async def add_to_queue(
         queue_pressure_at_join=pressure_at_join,
         predicted_wait_at_join=predicted_wait,
         prediction_request_id=prediction_request_id,
+        pricing_session_id=body.pricing_session_id,
+        quoted_price=body.quoted_price,
     )
     session.add(entry)
     await session.commit()
     await session.refresh(entry)
+    # Keep the pricing engine's Redis counters in sync. Premium joins are a
+    # queue_join + premium_purchase pair (purchase decrements the queue).
+    if body.entry_type == QueueEntryType.premium:
+        notify_engine(user.restaurant_id, [
+            ("queue_join", body.party_size),
+            ("premium_purchase", body.party_size),
+        ])
+    else:
+        notify_engine(user.restaurant_id, [("queue_join", body.party_size)])
     await _broadcast(session, user.restaurant_id, "joined", entry)
     return entry
 
@@ -208,8 +225,33 @@ async def seat_entry(
         )
     entry.status = QueueEntryStatus.seated
     entry.seated_at = datetime.now(timezone.utc)
+
+    # Premium seat = the sale actually happened. Write the Transaction row
+    # (70/30 split) that invoicing reads. gross = what was charged
+    # (skip_price, falling back to the engine quote). select-first keeps a
+    # concurrent double-tap from tripping the unique(queue_entry_id).
+    if entry.entry_type == QueueEntryType.premium:
+        gross = entry.skip_price or entry.quoted_price
+        if gross and gross > 0:
+            existing = (await session.execute(
+                select(Transaction).where(Transaction.queue_entry_id == entry.id)
+            )).scalar_one_or_none()
+            if existing is None:
+                restaurant_share = round(gross * 0.70)
+                session.add(Transaction(
+                    restaurant_id=user.restaurant_id,
+                    queue_entry_id=entry.id,
+                    gross_amount=gross,
+                    restaurant_share=restaurant_share,
+                    ifasto_fee=gross - restaurant_share,
+                ))
+
     await session.commit()
     await session.refresh(entry)
+    # Engine sync: a REGULAR seat leaves the engine's queue count; a premium
+    # party already left it at purchase time (premium_purchase decrements).
+    if entry.entry_type == QueueEntryType.regular:
+        notify_engine(user.restaurant_id, [("queue_leave", entry.party_size)])
     await _broadcast(session, user.restaurant_id, "seated", entry)
     return entry
 
@@ -230,6 +272,12 @@ async def walk_away(
     entry.walked_away_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(entry)
+    # Engine sync: regular walk-away leaves the queue; premium walk-away
+    # releases the premium slot (frees the per-category cap).
+    if entry.entry_type == QueueEntryType.premium:
+        notify_engine(user.restaurant_id, [("premium_release", entry.party_size)])
+    else:
+        notify_engine(user.restaurant_id, [("queue_leave", entry.party_size)])
     await _broadcast(session, user.restaurant_id, "walked_away", entry)
     return entry
 

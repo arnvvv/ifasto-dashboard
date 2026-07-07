@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +20,18 @@ from app.config import settings
 from app.models.restaurant import Restaurant, VenueSettings
 
 logger = logging.getLogger(__name__)
+
+JST = ZoneInfo("Asia/Tokyo")
+
+
+def default_service_id(restaurant_id: uuid.UUID | str) -> str:
+    """Date-scoped engine service key: {restaurant_id}:{JST date}.
+
+    The engine's Redis counters live under this key. A static ':default'
+    would accumulate state forever; scoping by JST date means any drift from
+    dropped events self-heals at the daily rollover, which is also the
+    natural service boundary for a restaurant."""
+    return f"{restaurant_id}:{datetime.now(JST).date().isoformat()}"
 
 # Until tourist density becomes a per-venue column, all pilot venues are
 # Tokyo and inherit a single sensible default.
@@ -73,7 +87,7 @@ def build_engine_payload(
     venue_config = {
         # Identity + currency
         "venue_id": str(restaurant.id),
-        "service_id": service_id or f"{restaurant.id}:default",
+        "service_id": service_id or default_service_id(restaurant.id),
         "currency": restaurant.currency,
         "minor_units": 0 if restaurant.currency == "JPY" else 2,
         # Pricing anchors — engine derives base/floor/ceiling from these:

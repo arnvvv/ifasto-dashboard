@@ -37,6 +37,10 @@ export interface QueueEntryCreate {
   phone?: string | null;
   notes?: string | null;
   skip_price?: number | null;
+  // Offer-to-sale linkage (premium): the quote session accepted + the
+  // engine's quoted price (skip_price may be operator-overridden).
+  pricing_session_id?: string | null;
+  quoted_price?: number | null;
 }
 
 export const queueApi = {

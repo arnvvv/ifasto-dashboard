@@ -15,6 +15,10 @@ class QueueEntryCreate(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
     notes: str | None = Field(default=None, max_length=500)
     skip_price: int | None = None  # yen — set when entry_type=premium
+    # Offer-to-sale linkage: the quote session this party accepted (joins to
+    # price_quote_logs) and the engine's quoted price at acceptance time.
+    pricing_session_id: str | None = Field(default=None, max_length=64)
+    quoted_price: int | None = None
 
 
 class QueueEntryRead(BaseModel):
@@ -30,6 +34,7 @@ class QueueEntryRead(BaseModel):
     walked_away_at: datetime | None = None
     status: QueueEntryStatus
     skip_price: int | None
+    quoted_price: int | None = None
     predicted_wait_at_join: float | None = None
 
     model_config = {"from_attributes": True}

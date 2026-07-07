@@ -82,6 +82,13 @@ class QueueEntry(Base):
     # this row and the logged feature vector that produced the prediction.
     prediction_request_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
+    # --- Offer-to-sale linkage (premium entries) ---
+    # session_id used to fetch/lock the quote this party accepted; joins to
+    # price_quote_logs.session_id. quoted_price = what the engine quoted;
+    # skip_price = what the operator actually charged (override is signal).
+    pricing_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    quoted_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     restaurant: Mapped["Restaurant"] = relationship(back_populates="queue_entries")
     transaction: Mapped["Transaction | None"] = relationship(
         back_populates="queue_entry", uselist=False
