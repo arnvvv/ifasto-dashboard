@@ -147,6 +147,12 @@ export default function OpsPage() {
           >
             History
           </a>
+          <a
+            href="/ops/survey"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+          >
+            Survey
+          </a>
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-mono ${
               connected ? "text-emerald-600" : "text-ifasto-secondary"

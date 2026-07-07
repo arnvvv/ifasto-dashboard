@@ -7,6 +7,7 @@ from app.api import pricing as pricing_api
 from app.api import queue as queue_api
 from app.api import reports as reports_api
 from app.api import settings as settings_api
+from app.api import surveys as surveys_api
 from app.api import websockets as ws_api
 from app.auth.users import auth_backend, current_active_user, fastapi_users
 from app.models.user import User
@@ -75,3 +76,6 @@ app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"
 
 # Reports — end-of-day summary + week-over-week trends.
 app.include_router(reports_api.router, prefix="/api/reports", tags=["reports"])
+
+# WTP field surveys — stated-preference rows, separate from operational data.
+app.include_router(surveys_api.router, prefix="/api/surveys", tags=["surveys"])

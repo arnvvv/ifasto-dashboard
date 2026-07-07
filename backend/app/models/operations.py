@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    Boolean,
     Date,
     DateTime,
     Enum,
@@ -125,6 +126,33 @@ class PriceQuoteLog(Base):
     session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # Echoed into the ML server's prediction JSONL for exact log joins.
     request_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+class WtpSurvey(Base):
+    """Field intercept survey: stated willingness-to-pay, collected standing
+    in real queues. Column names mirror queue_entries/price_quote_logs so
+    rows stack in analysis (UNION in the elasticity script); deliberately a
+    SEPARATE table so stated preference never contaminates the model's
+    label source or the conversion denominator."""
+
+    __tablename__ = "wtp_surveys"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Null for field venues that aren't in the system (most of them).
+    restaurant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=True
+    )
+    venue_label: Mapped[str] = mapped_column(String(120), nullable=False)
+    observed_wait_mins: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    party_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    respondent: Mapped[str] = mapped_column(String(10), nullable=False)  # tourist | local
+    would_skip: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    max_fee_yen: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
