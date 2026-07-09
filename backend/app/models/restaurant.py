@@ -18,7 +18,7 @@ from sqlalchemy import (
     Time,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -98,6 +98,11 @@ class VenueSettings(Base):
     max_party_size_eligible: Mapped[int] = mapped_column(Integer, default=4)
     large_party_cap_per_service: Mapped[int] = mapped_column(Integer, default=1)
     premium_paused: Mapped[bool] = mapped_column(Boolean, default=False)  # the big pause button
+    # Per-venue pricing-curve overrides, forwarded verbatim to the engine's
+    # venue_config.pricing_overrides (schema validated engine-side). This is
+    # the write target for calibration outputs — curve tuning without an
+    # engine deploy. NULL = engine defaults.
+    pricing_overrides: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

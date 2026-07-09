@@ -99,6 +99,10 @@ def build_engine_payload(
         "capacity": restaurant.seat_count,
         "avg_dining_min": restaurant.avg_turn_minutes,
     }
+    # Per-venue curve overrides (calibration output). Forwarded verbatim;
+    # the engine validates structure and 400s malformed overrides.
+    if getattr(vs, "pricing_overrides", None):
+        venue_config["pricing_overrides"] = vs.pricing_overrides
     queue_state = {
         "queue_length": total_queue,
         "party_size": party_size,
