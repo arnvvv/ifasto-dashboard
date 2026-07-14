@@ -8,12 +8,14 @@ takes effect on the very next quote with no engine deploy.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.users import current_active_user, require_role
 from app.database import get_session
-from app.models.restaurant import VenueSettings
+from app.models.restaurant import Restaurant, VenueSettings
 from app.models.user import User, UserRole
 from app.schemas.settings import VenueSettingsRead, VenueSettingsUpdate
 from app.services.engine_payload import _VS_DEFAULTS
@@ -54,3 +56,46 @@ async def update_settings(
     await session.commit()
     await session.refresh(vs)
     return vs
+
+
+def _qr_payload(venue: Restaurant) -> dict:
+    return {
+        "qr_token": venue.qr_token,
+        "guest_url": f"https://app.ifasto.com/q/{venue.qr_token}" if venue.qr_token else None,
+        "venue_name": venue.name,
+        "venue_name_ja": venue.name_ja,
+    }
+
+
+@router.get("/qr")
+async def get_qr(
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """The venue's guest-join QR target, for the printable /ops/qr sign.
+    Mints a token on first read so venues created before the QR feature
+    work without a manual step."""
+    venue = await session.get(Restaurant, user.restaurant_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found.")
+    if not venue.qr_token:
+        venue.qr_token = secrets.token_urlsafe(18)
+        await session.commit()
+        await session.refresh(venue)
+    return _qr_payload(venue)
+
+
+@router.post("/qr/rotate")
+async def rotate_qr(
+    user: User = Depends(require_role(UserRole.owner, UserRole.manager)),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Invalidate the printed QR and mint a new token (leak/abuse response).
+    The old sign stops working the moment this returns — reprint first."""
+    venue = await session.get(Restaurant, user.restaurant_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found.")
+    venue.qr_token = secrets.token_urlsafe(18)
+    await session.commit()
+    await session.refresh(venue)
+    return _qr_payload(venue)

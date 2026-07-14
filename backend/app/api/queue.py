@@ -158,18 +158,20 @@ async def queue_state(
 # Write endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/entries", response_model=QueueEntryRead, status_code=201)
-async def add_to_queue(
+async def create_entry(
+    session: AsyncSession,
+    restaurant_id: uuid.UUID,
     body: QueueEntryCreate,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_session),
 ) -> QueueEntry:
+    """Shared join path — used by the staff endpoint AND the public guest QR
+    endpoint, so both produce identical training capture, ticket numbers,
+    engine sync, and WS broadcasts."""
     # --- Join-time snapshot, computed BEFORE the new entry exists so the
     # party doesn't count itself (and before session.add so autoflush can't
     # sneak it into the waiting query). Every field here is a training
     # feature that cannot be reconstructed later.
-    pre_state = await compute_queue_state(session, user.restaurant_id)
-    restaurant = await session.get(Restaurant, user.restaurant_id)
+    pre_state = await compute_queue_state(session, restaurant_id)
+    restaurant = await session.get(Restaurant, restaurant_id)
 
     pressure_at_join: float | None = None
     predicted_wait: float | None = None
@@ -178,7 +180,7 @@ async def add_to_queue(
         pressure_at_join = queue_pressure(
             pre_state.regular_waiting, pre_state.premium_waiting, restaurant.seat_count
         )
-        vs = await get_venue_settings(session, user.restaurant_id)
+        vs = await get_venue_settings(session, restaurant_id)
         venue_config, queue_state = build_engine_payload(
             restaurant,
             vs,
@@ -199,13 +201,13 @@ async def add_to_queue(
     # this race-free in practice; move to a DB sequence per venue if the API
     # ever runs multiple workers.
     ticket_stmt = select(func.coalesce(func.max(QueueEntry.ticket_no), 0)).where(
-        QueueEntry.restaurant_id == user.restaurant_id,
+        QueueEntry.restaurant_id == restaurant_id,
         QueueEntry.joined_at >= _today_start_utc(),
     )
     next_ticket = int((await session.execute(ticket_stmt)).scalar_one()) + 1
 
     entry = QueueEntry(
-        restaurant_id=user.restaurant_id,
+        restaurant_id=restaurant_id,
         ticket_no=next_ticket,
         party_size=body.party_size,
         entry_type=body.entry_type,
@@ -228,14 +230,23 @@ async def add_to_queue(
     # Keep the pricing engine's Redis counters in sync. Premium joins are a
     # queue_join + premium_purchase pair (purchase decrements the queue).
     if body.entry_type == QueueEntryType.premium:
-        notify_engine(user.restaurant_id, [
+        notify_engine(restaurant_id, [
             ("queue_join", body.party_size),
             ("premium_purchase", body.party_size),
         ])
     else:
-        notify_engine(user.restaurant_id, [("queue_join", body.party_size)])
-    await _broadcast(session, user.restaurant_id, "joined", entry)
+        notify_engine(restaurant_id, [("queue_join", body.party_size)])
+    await _broadcast(session, restaurant_id, "joined", entry)
     return entry
+
+
+@router.post("/entries", response_model=QueueEntryRead, status_code=201)
+async def add_to_queue(
+    body: QueueEntryCreate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> QueueEntry:
+    return await create_entry(session, user.restaurant_id, body)
 
 
 @router.patch("/entries/{entry_id}/seat", response_model=QueueEntryRead)

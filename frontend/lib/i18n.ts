@@ -59,6 +59,7 @@ export interface Dict {
     ownerOnly: string;
     caps: string;
     help: string;
+    qrSign: string;
     history: string;
     survey: string;
     account: string;
@@ -183,6 +184,46 @@ export interface Dict {
     updating: string;
     language: string;
   };
+  guest: {
+    joinTitle: string;
+    waitingNow: (n: number) => string;
+    partySize: string;
+    people: (n: number) => string;
+    join: string;
+    joining: string;
+    queueFull: string;
+    tooMany: string;
+    unknownVenue: string;
+    network: string;
+    returnToTicket: string;
+    ticketTitle: string;
+    ticketNo: (n: number) => string;
+    partiesAhead: (n: number) => string;
+    estWait: (m: number) => string;
+    waitUnknown: string;
+    statusWaiting: string;
+    statusSeated: string;
+    statusSeatedBody: string;
+    statusWalked: string;
+    statusWalkedBody: string;
+    keepOpen: string;
+    leave: string;
+    leaveConfirm: string;
+    leaveYes: string;
+    leaveNo: string;
+    poweredBy: string;
+  };
+  qrSign: {
+    title: string;
+    scanToJoin: string;
+    subtitle: string;
+    print: string;
+    rotate: string;
+    rotateConfirm: string;
+    rotated: string;
+    backToBoard: string;
+    urlLabel: string;
+  };
 }
 
 export const ja: Dict = {
@@ -227,6 +268,7 @@ export const ja: Dict = {
     ownerOnly: "オーナー・店長のみ操作できます",
     caps: "上限設定",
     help: "使い方",
+    qrSign: "店頭QR",
     history: "履歴",
     survey: "調査",
     account: "アカウント",
@@ -352,6 +394,46 @@ export const ja: Dict = {
     updating: "変更中…",
     language: "表示言語",
   },
+  guest: {
+    joinTitle: "順番待ちに参加",
+    waitingNow: (n) => `現在 ${n} 組待ち`,
+    partySize: "人数を選んでください",
+    people: (n) => `${n}名`,
+    join: "受付する",
+    joining: "受付中…",
+    queueFull: "ただいま満員のため、店頭スタッフにお声がけください。",
+    tooMany: "受付回数の上限に達しました。しばらくしてからお試しください。",
+    unknownVenue: "このQRコードは無効です。店頭スタッフにお声がけください。",
+    network: "通信エラーです。もう一度お試しください。",
+    returnToTicket: "受付済みの整理券を表示",
+    ticketTitle: "整理券",
+    ticketNo: (n) => `${n}番`,
+    partiesAhead: (n) => `あと ${n} 組`,
+    estWait: (m) => `目安 約${m}分`,
+    waitUnknown: "待ち時間は店頭でご確認ください",
+    statusWaiting: "お呼び出しまでお待ちください",
+    statusSeated: "ご案内済みです",
+    statusSeatedBody: "スタッフの案内に従ってお進みください。",
+    statusWalked: "受付を取り消しました",
+    statusWalkedBody: "またのご来店をお待ちしております。",
+    keepOpen: "この画面は自動で更新されます。閉じずにお待ちください。",
+    leave: "受付を取り消す",
+    leaveConfirm: "順番待ちを取り消しますか？",
+    leaveYes: "取り消す",
+    leaveNo: "戻る",
+    poweredBy: "Powered by ifasto",
+  },
+  qrSign: {
+    title: "店頭QRサイン",
+    scanToJoin: "スキャンして順番待ちに参加",
+    subtitle: "お並びの前に、スマートフォンで受付できます",
+    print: "印刷する",
+    rotate: "QRを再発行",
+    rotateConfirm: "再発行すると、印刷済みのQRは使えなくなります。続けますか？",
+    rotated: "新しいQRを発行しました。サインを印刷し直してください。",
+    backToBoard: "← ボードへ戻る",
+    urlLabel: "受付URL",
+  },
 };
 
 export const en: Dict = {
@@ -395,6 +477,7 @@ export const en: Dict = {
     ownerOnly: "Owner/manager only",
     caps: "Caps",
     help: "Help",
+    qrSign: "Door QR",
     history: "History",
     survey: "Survey",
     account: "Account",
@@ -519,6 +602,46 @@ export const en: Dict = {
     update: "Update password",
     updating: "Saving…",
     language: "Language",
+  },
+  guest: {
+    joinTitle: "Join the queue",
+    waitingNow: (n) => `${n} ${n === 1 ? "party" : "parties"} waiting now`,
+    partySize: "How many people?",
+    people: (n) => `${n}`,
+    join: "Join queue",
+    joining: "Joining…",
+    queueFull: "The queue is full right now. Please see the staff at the door.",
+    tooMany: "Too many joins from this device. Please try again later.",
+    unknownVenue: "This QR code is not valid. Please see the staff at the door.",
+    network: "Network error. Please try again.",
+    returnToTicket: "View your ticket",
+    ticketTitle: "Your ticket",
+    ticketNo: (n) => `No. ${n}`,
+    partiesAhead: (n) => `${n} ${n === 1 ? "party" : "parties"} ahead`,
+    estWait: (m) => `About ${m} min`,
+    waitUnknown: "Ask the staff for the current wait",
+    statusWaiting: "Please wait to be called",
+    statusSeated: "You have been seated",
+    statusSeatedBody: "Please follow the staff's directions.",
+    statusWalked: "Your spot has been cancelled",
+    statusWalkedBody: "We hope to see you again.",
+    keepOpen: "This page updates automatically. Keep it open.",
+    leave: "Leave the queue",
+    leaveConfirm: "Leave the queue and give up your spot?",
+    leaveYes: "Leave",
+    leaveNo: "Stay",
+    poweredBy: "Powered by ifasto",
+  },
+  qrSign: {
+    title: "Door QR sign",
+    scanToJoin: "Scan to join the queue",
+    subtitle: "Join from your phone before lining up",
+    print: "Print",
+    rotate: "Rotate QR",
+    rotateConfirm: "Rotating invalidates the printed QR immediately. Continue?",
+    rotated: "New QR issued. Reprint the sign.",
+    backToBoard: "← Live board",
+    urlLabel: "Join URL",
   },
 };
 

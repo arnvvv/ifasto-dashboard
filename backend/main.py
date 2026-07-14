@@ -12,6 +12,7 @@ from app.database import SessionLocal
 
 from app.api import contact as contact_api
 from app.api import pricing as pricing_api
+from app.api import public as public_api
 from app.api import queue as queue_api
 from app.api import reports as reports_api
 from app.api import settings as settings_api
@@ -152,3 +153,6 @@ app.include_router(surveys_api.router, prefix="/api/surveys", tags=["surveys"])
 
 # Public contact form (marketing site) — rate-limited, honeypotted.
 app.include_router(contact_api.router, prefix="/api/contact", tags=["contact"])
+
+# Public guest QR flow — join + status, no auth, rate-limited.
+app.include_router(public_api.router, prefix="/api/public", tags=["public"])

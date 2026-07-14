@@ -250,6 +250,12 @@ export default function OpsPage() {
             {t.ops.help}
           </a>
           <a
+            href="/ops/qr"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
+          >
+            {t.ops.qrSign}
+          </a>
+          <a
             href="/ops/history"
             className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
           >

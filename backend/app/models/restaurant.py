@@ -50,6 +50,9 @@ class Restaurant(Base):
     currency: Mapped[str] = mapped_column(String(3), default="JPY")
     seat_count: Mapped[int] = mapped_column(Integer, default=20)
     avg_turn_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    # Unguessable slug encoded in the door QR (app.ifasto.com/q/{qr_token}).
+    # Separate from the UUID so it can be rotated if a QR leaks/abused.
+    qr_token: Mapped[str | None] = mapped_column(String(48), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

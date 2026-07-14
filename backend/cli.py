@@ -63,6 +63,7 @@ async def create_owner(
             venue_type=VenueType(venue_type),
             avg_check_size=avg_check,
             currency="JPY",
+            qr_token=secrets.token_urlsafe(18),
         )
         session.add(restaurant)
         await session.flush()  # populate restaurant.id
@@ -161,6 +162,22 @@ async def export_training_data(out_path: str | None, include_test: bool) -> int:
     return len(rows)
 
 
+async def rotate_qr(restaurant_name: str) -> str:
+    """Mint (or rotate) a venue's guest QR token. Rotation instantly
+    invalidates the old printed QR — reprint before swapping signs."""
+    async with SessionLocal() as session:
+        venue = (
+            await session.execute(
+                select(Restaurant).where(Restaurant.name == restaurant_name)
+            )
+        ).scalar_one_or_none()
+        if venue is None:
+            raise SystemExit(f"no restaurant named {restaurant_name!r}")
+        venue.qr_token = secrets.token_urlsafe(18)
+        await session.commit()
+        return venue.qr_token
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cli.py", description="ifasto admin CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -188,7 +205,19 @@ def main() -> None:
         help="Keep rows whose party_name contains 'test' (excluded by default)",
     )
 
+    rq = sub.add_parser(
+        "rotate-qr",
+        help="Mint or rotate a venue's guest QR token (invalidates the old QR)",
+    )
+    rq.add_argument("--restaurant-name", required=True)
+
     args = parser.parse_args()
+
+    if args.cmd == "rotate-qr":
+        token = asyncio.run(rotate_qr(args.restaurant_name))
+        print(f"qr_token: {token}")
+        print(f"guest URL: https://app.ifasto.com/q/{token}")
+        return
 
     if args.cmd == "export-training-data":
         n = asyncio.run(export_training_data(args.out, args.include_test))
