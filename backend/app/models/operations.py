@@ -52,6 +52,9 @@ class QueueEntry(Base):
         UUID(as_uuid=True), ForeignKey("restaurants.id"), nullable=False, index=True
     )
     party_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Daily per-venue ticket number (整理券番号) — what staff call out. Resets
+    # implicitly: computed as max(today's tickets)+1 at join time.
+    ticket_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
     entry_type: Mapped[QueueEntryType] = mapped_column(
         Enum(QueueEntryType), default=QueueEntryType.regular, nullable=False
     )

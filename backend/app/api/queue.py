@@ -195,8 +195,18 @@ async def add_to_queue(
             venue_config, queue_state
         )
 
+    # Daily ticket number: max(today) + 1. Single-worker deployment makes
+    # this race-free in practice; move to a DB sequence per venue if the API
+    # ever runs multiple workers.
+    ticket_stmt = select(func.coalesce(func.max(QueueEntry.ticket_no), 0)).where(
+        QueueEntry.restaurant_id == user.restaurant_id,
+        QueueEntry.joined_at >= _today_start_utc(),
+    )
+    next_ticket = int((await session.execute(ticket_stmt)).scalar_one()) + 1
+
     entry = QueueEntry(
         restaurant_id=user.restaurant_id,
+        ticket_no=next_ticket,
         party_size=body.party_size,
         entry_type=body.entry_type,
         party_name=body.party_name,
@@ -296,6 +306,70 @@ async def walk_away(
     else:
         notify_engine(user.restaurant_id, [("queue_leave", entry.party_size)])
     await _broadcast(session, user.restaurant_id, "walked_away", entry)
+    return entry
+
+
+@router.patch("/entries/{entry_id}/reinstate", response_model=QueueEntryRead)
+async def reinstate_entry(
+    entry_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> QueueEntry:
+    """Undo a seat or walk-away (fat-finger protection). Allowed within 10
+    minutes of the status change; the UI offers it for 30 seconds. Restores
+    waiting status, deletes any Transaction the premium seat created, and
+    reverses the engine counter events."""
+    entry = await _get_entry_scoped(session, entry_id, user.restaurant_id)
+    if entry.status == QueueEntryStatus.waiting:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Entry is already waiting.",
+        )
+
+    changed_at = entry.seated_at if entry.status == QueueEntryStatus.seated else entry.walked_away_at
+    if changed_at is not None:
+        aware = changed_at if changed_at.tzinfo else changed_at.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - aware).total_seconds() > 600:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Too old to undo (10 minute window).",
+            )
+
+    prev_status = entry.status
+
+    # A premium seat wrote a Transaction — the sale un-happened.
+    if prev_status == QueueEntryStatus.seated and entry.entry_type == QueueEntryType.premium:
+        tx = (await session.execute(
+            select(Transaction).where(Transaction.queue_entry_id == entry.id)
+        )).scalar_one_or_none()
+        if tx is not None:
+            await session.delete(tx)
+
+    entry.status = QueueEntryStatus.waiting
+    entry.seated_at = None
+    entry.walked_away_at = None
+    await session.commit()
+    await session.refresh(entry)
+
+    # Reverse the engine counter events fired by the original action.
+    # Original: regular seat/walk -> queue_leave; premium walk ->
+    # premium_release; premium seat -> nothing.
+    if prev_status == QueueEntryStatus.seated:
+        if entry.entry_type == QueueEntryType.regular:
+            notify_engine(user.restaurant_id, [("queue_join", entry.party_size)])
+    else:  # walked_away
+        if entry.entry_type == QueueEntryType.premium:
+            # premium_purchase alone would decrement the regular queue; the
+            # join+purchase pair nets queue 0, premium +1 — the exact inverse
+            # of premium_release.
+            notify_engine(user.restaurant_id, [
+                ("queue_join", entry.party_size),
+                ("premium_purchase", entry.party_size),
+            ])
+        else:
+            notify_engine(user.restaurant_id, [("queue_join", entry.party_size)])
+
+    await _broadcast(session, user.restaurant_id, "reinstated", entry)
     return entry
 
 

@@ -90,7 +90,7 @@ export function useQueue(token: string | null): UseQueueResult {
             const entry = evt.entry;
             setEntries((prev) => {
               const idx = prev.findIndex((e) => e.id === entry.id);
-              if (evt.event === "joined") {
+              if (evt.event === "joined" || evt.event === "reinstated") {
                 return idx >= 0 ? prev : [...prev, entry];
               }
               // seated / walked_away — entry leaves the waiting list.

@@ -70,6 +70,15 @@ export interface Dict {
     tileSeatedToday: string;
     tilePremiumToday: string;
 
+    quickAdd: string;
+    quickAddDetail: string;
+    ticket: (n: number) => string;
+    undo: string;
+    undoSeated: (ticket: string) => string;
+    undoWalked: (ticket: string) => string;
+    errUndo: string;
+    offlineBanner: string;
+
     nextUp: string;
     queueEmpty: string;
     walkIn: string;
@@ -228,6 +237,15 @@ export const ja: Dict = {
     tileSeatedToday: "本日の案内数",
     tilePremiumToday: "本日のファストパス売上",
 
+    quickAdd: "かんたん受付",
+    quickAddDetail: "＋詳細",
+    ticket: (n) => `${n}番`,
+    undo: "取り消し",
+    undoSeated: (ticket) => `${ticket}を案内しました`,
+    undoWalked: (ticket) => `${ticket}を不在にしました`,
+    errUndo: "取り消しに失敗しました。",
+    offlineBanner: "オフラインです。紙で記録し、復旧後に入力してください。",
+
     nextUp: "次のご案内",
     queueEmpty: "順番待ちはありません",
     walkIn: "ウォークイン",
@@ -385,6 +403,15 @@ export const en: Dict = {
     tileMedianWait: "Median wait (today)",
     tileSeatedToday: "Seated today",
     tilePremiumToday: "Premium ¥ today",
+
+    quickAdd: "Quick add",
+    quickAddDetail: "+ details",
+    ticket: (n) => `#${n}`,
+    undo: "Undo",
+    undoSeated: (ticket) => `Seated ${ticket}`,
+    undoWalked: (ticket) => `Marked ${ticket} walked away`,
+    errUndo: "Could not undo.",
+    offlineBanner: "Offline. Record on paper and enter entries when it recovers.",
 
     nextUp: "Next up",
     queueEmpty: "Queue is empty",

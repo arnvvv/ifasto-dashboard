@@ -8,6 +8,7 @@ export type QueueEntryStatus = "waiting" | "seated" | "walked_away";
 export interface QueueEntry {
   id: string;
   restaurant_id: string;
+  ticket_no?: number | null;
   party_size: number;
   entry_type: QueueEntryType;
   party_name: string | null;
@@ -53,6 +54,8 @@ export const queueApi = {
     api<QueueEntry>(`/api/queue/entries/${id}/seat`, { method: "PATCH", token }),
   walkAway: (token: string, id: string) =>
     api<QueueEntry>(`/api/queue/entries/${id}/walk-away`, { method: "PATCH", token }),
+  reinstate: (token: string, id: string) =>
+    api<QueueEntry>(`/api/queue/entries/${id}/reinstate`, { method: "PATCH", token }),
 };
 
 // WS URL derived from API_BASE — handles both relative (prod, same origin)

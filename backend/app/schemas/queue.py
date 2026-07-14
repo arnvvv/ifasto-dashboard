@@ -24,6 +24,7 @@ class QueueEntryCreate(BaseModel):
 class QueueEntryRead(BaseModel):
     id: uuid.UUID
     restaurant_id: uuid.UUID
+    ticket_no: int | None = None
     party_size: int
     entry_type: QueueEntryType
     party_name: str | None

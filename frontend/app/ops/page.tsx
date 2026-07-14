@@ -37,6 +37,71 @@ export default function OpsPage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [quickBusy, setQuickBusy] = useState<number | null>(null);
+
+  // 30-second undo window after seat/walk (fat-finger protection).
+  const [undoState, setUndoState] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function armUndo(id: string, label: string) {
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    setUndoState({ id, label });
+    undoTimer.current = setTimeout(() => setUndoState(null), 30_000);
+  }
+
+  async function handleUndo() {
+    if (!token || !undoState) return;
+    const id = undoState.id;
+    setUndoState(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    try {
+      await queueApi.reinstate(token, id);
+    } catch {
+      setActionError(t.ops.errUndo);
+    }
+    void refresh();
+  }
+
+  // Keep the tablet awake through a whole service. Re-acquire when the tab
+  // becomes visible again (the lock is released on hide).
+  useEffect(() => {
+    let lock: { release: () => Promise<void> } | null = null;
+    async function acquire() {
+      try {
+        const wl = (navigator as Navigator & {
+          wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> };
+        }).wakeLock;
+        if (wl) lock = await wl.request("screen");
+      } catch {
+        // Not supported or denied — non-fatal.
+      }
+    }
+    void acquire();
+    const onVis = () => {
+      if (document.visibilityState === "visible") void acquire();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      void lock?.release().catch(() => {});
+    };
+  }, []);
+
+  async function quickAdd(size: number) {
+    if (!token || quickBusy !== null) return;
+    setQuickBusy(size);
+    setActionError(null);
+    try {
+      await queueApi.add(token, { party_size: size, entry_type: "regular" });
+    } catch (err) {
+      setActionError(toMessage(err, t.ops.errAdd));
+    } finally {
+      setQuickBusy(null);
+    }
+  }
 
   // Venue settings — pause state drives the header toggle; caps live in the
   // drawer. Staff see state but only owner/manager can change it.
@@ -70,7 +135,13 @@ export default function OpsPage() {
     setActionId(id);
     setActionError(null);
     try {
-      await queueApi.seat(token, id);
+      const seated = await queueApi.seat(token, id);
+      armUndo(
+        id,
+        t.ops.undoSeated(
+          seated.ticket_no != null ? t.ops.ticket(seated.ticket_no) : "",
+        ),
+      );
       // WS will deliver the update; refresh as a belt-and-braces fallback.
     } catch (err) {
       setActionError(toMessage(err, t.ops.errSeat));
@@ -85,7 +156,13 @@ export default function OpsPage() {
     setActionId(id);
     setActionError(null);
     try {
-      await queueApi.walkAway(token, id);
+      const walked = await queueApi.walkAway(token, id);
+      armUndo(
+        id,
+        t.ops.undoWalked(
+          walked.ticket_no != null ? t.ops.ticket(walked.ticket_no) : "",
+        ),
+      );
     } catch (err) {
       setActionError(toMessage(err, t.ops.errWalk));
       void refresh();
@@ -193,6 +270,12 @@ export default function OpsPage() {
         </div>
       </header>
 
+      {!connected && !loading && (
+        <div className="px-4 sm:px-6 py-2.5 bg-amber-100 border-b border-amber-300 text-sm text-amber-900 font-medium">
+          {t.ops.offlineBanner}
+        </div>
+      )}
+
       {showCaps && settings && token && (
         <CapsDrawer
           token={token}
@@ -226,6 +309,28 @@ export default function OpsPage() {
         />
       </section>
 
+      <section className="px-4 sm:px-6 py-3 border-b border-ifasto-border flex items-center gap-2 sm:gap-3">
+        <span className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary shrink-0">
+          {t.ops.quickAdd}
+        </span>
+        {[1, 2, 3, 4].map((n) => (
+          <button
+            key={n}
+            onClick={() => void quickAdd(n)}
+            disabled={quickBusy !== null}
+            className="flex-1 sm:flex-none sm:w-14 py-3 text-base font-semibold border border-ifasto-border rounded-md bg-white hover:border-ifasto-text disabled:opacity-40 transition-colors tabular-nums"
+          >
+            {quickBusy === n ? "…" : n}
+          </button>
+        ))}
+        <button
+          onClick={() => setShowAdd(true)}
+          className="shrink-0 px-4 py-3 text-sm text-ifasto-secondary border border-ifasto-border rounded-md hover:border-ifasto-text transition-colors"
+        >
+          {t.ops.quickAddDetail}
+        </button>
+      </section>
+
       <section className="px-4 sm:px-6 py-4 border-b border-ifasto-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary">
@@ -234,6 +339,11 @@ export default function OpsPage() {
           <p className="font-display text-xl truncate">
             {nextUp ? (
               <>
+                {nextUp.ticket_no != null && (
+                  <span className="font-mono font-bold text-ifasto-text mr-2">
+                    {t.ops.ticket(nextUp.ticket_no)}
+                  </span>
+                )}
                 {nextUp.party_name || t.ops.walkIn}{" "}
                 <span className="text-ifasto-secondary">
                   · {t.common.partyOf(nextUp.party_size)}
@@ -294,6 +404,18 @@ export default function OpsPage() {
           loading={loading}
         />
       </section>
+
+      {undoState && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-ifasto-text text-ifasto-bg rounded-lg px-5 py-3 shadow-lg">
+          <span className="text-sm">{undoState.label}</span>
+          <button
+            onClick={() => void handleUndo()}
+            className="text-sm font-bold underline underline-offset-2"
+          >
+            {t.ops.undo}
+          </button>
+        </div>
+      )}
 
       {showAdd && token && (
         <AddPartyModal
@@ -411,8 +533,8 @@ function EntryRow({
   const waited = waitedMinutes(entry.joined_at);
   return (
     <li className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
-      <span className="font-mono text-sm text-ifasto-secondary w-6 shrink-0">
-        {position}
+      <span className="font-mono text-base font-bold text-ifasto-text w-12 shrink-0 tabular-nums">
+        {entry.ticket_no != null ? t.ops.ticket(entry.ticket_no) : position}
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">
