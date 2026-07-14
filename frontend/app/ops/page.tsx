@@ -210,10 +210,10 @@ export default function OpsPage() {
         <Stat label={t.ops.tileRegular} value={state?.regular_waiting ?? regular.length} />
         <Stat label={t.ops.tilePremium} value={state?.premium_waiting ?? premium.length} />
         <Stat
-          label={t.ops.tileAvgWait}
+          label={t.ops.tileMedianWait}
           value={
-            state?.avg_wait_minutes != null
-              ? t.common.minutes(Math.round(state.avg_wait_minutes))
+            state?.median_wait_today_mins != null
+              ? t.common.minutes(Math.round(state.median_wait_today_mins))
               : "—"
           }
         />

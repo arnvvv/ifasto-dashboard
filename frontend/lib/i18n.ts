@@ -66,7 +66,7 @@ export interface Dict {
     tileWaiting: string;
     tileRegular: string;
     tilePremium: string;
-    tileAvgWait: string;
+    tileMedianWait: string;
     tileSeatedToday: string;
     tilePremiumToday: string;
 
@@ -224,7 +224,7 @@ export const ja: Dict = {
     tileWaiting: "待ち組数",
     tileRegular: "通常",
     tilePremium: "ファストパス",
-    tileAvgWait: "平均待ち時間",
+    tileMedianWait: "待ち中央値（本日）",
     tileSeatedToday: "本日の案内数",
     tilePremiumToday: "本日のファストパス売上",
 
@@ -382,7 +382,7 @@ export const en: Dict = {
     tileWaiting: "Waiting",
     tileRegular: "Regular",
     tilePremium: "Premium",
-    tileAvgWait: "Avg wait",
+    tileMedianWait: "Median wait (today)",
     tileSeatedToday: "Seated today",
     tilePremiumToday: "Premium ¥ today",
 

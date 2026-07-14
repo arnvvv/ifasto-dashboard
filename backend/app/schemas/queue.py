@@ -51,3 +51,6 @@ class QueueState(BaseModel):
     # "Today" = JST midnight → now. Counts/sums of seated parties only.
     seated_today: int = 0
     premium_revenue_today: int = 0  # in venue currency minor units (yen)
+    # Median of COMPLETED waits today (seated_at - joined_at). Unlike the
+    # elapsed-time average of still-waiting parties, this can't understate.
+    median_wait_today_mins: float | None = None

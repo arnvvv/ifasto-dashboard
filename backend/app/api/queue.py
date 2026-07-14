@@ -79,6 +79,22 @@ async def compute_queue_state(
     )
     seated_today, premium_revenue_today = (await session.execute(today_stmt)).one()
 
+    # Median COMPLETED wait today — the honest tile number (elapsed-time
+    # averages of still-waiting parties systematically understate).
+    dur_stmt = select(QueueEntry.joined_at, QueueEntry.seated_at).where(
+        QueueEntry.restaurant_id == restaurant_id,
+        QueueEntry.status == QueueEntryStatus.seated,
+        QueueEntry.seated_at >= today_start,
+    )
+    durations = sorted(
+        (se - jo).total_seconds() / 60.0
+        for jo, se in (await session.execute(dur_stmt)).all()
+        if jo is not None and se is not None
+    )
+    median_wait_today = (
+        round(durations[len(durations) // 2], 1) if durations else None
+    )
+
     return QueueState(
         regular_waiting=regular,
         premium_waiting=premium,
@@ -86,6 +102,7 @@ async def compute_queue_state(
         avg_wait_minutes=round(avg_wait, 1) if avg_wait is not None else None,
         seated_today=int(seated_today or 0),
         premium_revenue_today=int(premium_revenue_today or 0),
+        median_wait_today_mins=median_wait_today,
     )
 
 

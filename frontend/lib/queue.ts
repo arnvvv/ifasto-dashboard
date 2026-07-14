@@ -28,6 +28,7 @@ export interface QueueState {
   avg_wait_minutes: number | null;
   seated_today: number;
   premium_revenue_today: number;  // yen (integer minor units)
+  median_wait_today_mins: number | null;
 }
 
 export interface QueueEntryCreate {
