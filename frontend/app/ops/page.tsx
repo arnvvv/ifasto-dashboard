@@ -104,16 +104,39 @@ export default function OpsPage() {
 
   return (
     <main className="flex-1 flex flex-col">
-      <header className="border-b border-ifasto-border px-6 py-4 flex items-center justify-between gap-4">
-        <div>
-          <p className="font-display text-2xl tracking-tight leading-none">
-            {t.ops.title}
-          </p>
-          <p className="text-xs text-ifasto-secondary mt-1">
-            {t.ops.signedInAs(user.name)} · {t.common.roleLabel(user.role)}
-          </p>
+      <header className="border-b border-ifasto-border px-4 sm:px-6 py-3 sm:py-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-display text-xl sm:text-2xl tracking-tight leading-none truncate">
+              {t.ops.title}
+            </p>
+            <p className="text-xs text-ifasto-secondary mt-1 truncate">
+              {t.ops.signedInAs(user.name)} · {t.common.roleLabel(user.role)}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-mono ${
+                connected ? "text-emerald-600" : "text-ifasto-secondary"
+              }`}
+              title={connected ? t.ops.liveTooltip : t.ops.offlineTooltip}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  connected ? "bg-emerald-500" : "bg-ifasto-border"
+                }`}
+              />
+              {connected ? t.ops.live : t.ops.offline}
+            </span>
+            <button
+              onClick={() => void logout()}
+              className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+            >
+              {t.common.signOut}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {settings && (
             <button
               onClick={() => void togglePause()}
@@ -125,7 +148,7 @@ export default function OpsPage() {
                     : t.ops.pauseTooltipOn
                   : t.ops.ownerOnly
               }
-              className={`px-3 py-1.5 rounded-md text-xs font-mono font-medium border transition-colors ${
+              className={`px-3 py-2 rounded-md text-xs font-mono font-medium border transition-colors ${
                 settings.premium_paused
                   ? "bg-amber-100 border-amber-300 text-amber-800"
                   : "bg-emerald-50 border-emerald-200 text-emerald-700"
@@ -137,7 +160,7 @@ export default function OpsPage() {
           {canEditSettings && (
             <button
               onClick={() => setShowCaps((v) => !v)}
-              className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+              className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
               title={t.ops.caps}
             >
               {t.ops.caps}
@@ -145,47 +168,28 @@ export default function OpsPage() {
           )}
           <a
             href="/ops/help"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
           >
             {t.ops.help}
           </a>
           <a
             href="/ops/history"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
           >
             {t.ops.history}
           </a>
           <a
             href="/ops/survey"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
           >
             {t.ops.survey}
           </a>
           <a
             href="/ops/account"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
           >
             {t.ops.account}
           </a>
-          <span
-            className={`inline-flex items-center gap-1.5 text-xs font-mono ${
-              connected ? "text-emerald-600" : "text-ifasto-secondary"
-            }`}
-            title={connected ? t.ops.liveTooltip : t.ops.offlineTooltip}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                connected ? "bg-emerald-500" : "bg-ifasto-border"
-              }`}
-            />
-            {connected ? t.ops.live : t.ops.offline}
-          </span>
-          <button
-            onClick={() => void logout()}
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
-          >
-            {t.common.signOut}
-          </button>
         </div>
       </header>
 
@@ -201,7 +205,7 @@ export default function OpsPage() {
         />
       )}
 
-      <section className="px-6 py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <section className="px-4 sm:px-6 py-4 sm:py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
         <Stat label={t.ops.tileWaiting} value={state?.total_waiting ?? entries.length} />
         <Stat label={t.ops.tileRegular} value={state?.regular_waiting ?? regular.length} />
         <Stat label={t.ops.tilePremium} value={state?.premium_waiting ?? premium.length} />
@@ -222,7 +226,7 @@ export default function OpsPage() {
         />
       </section>
 
-      <section className="px-6 py-4 border-b border-ifasto-border flex items-center justify-between gap-3">
+      <section className="px-4 sm:px-6 py-4 border-b border-ifasto-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary">
             {t.ops.nextUp}
@@ -245,17 +249,17 @@ export default function OpsPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
           <button
             onClick={() => setShowAdd(true)}
-            className="px-4 py-2 text-sm border border-ifasto-border rounded-md hover:border-ifasto-text transition-colors"
+            className="flex-1 sm:flex-none px-4 py-3 sm:py-2 text-sm border border-ifasto-border rounded-md hover:border-ifasto-text transition-colors"
           >
             {t.ops.addParty}
           </button>
           <button
             onClick={() => nextUp && handleSeat(nextUp.id)}
             disabled={!nextUp || actionId === nextUp?.id}
-            className="px-4 py-2 text-sm bg-ifasto-text text-ifasto-bg rounded-md font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+            className="flex-1 sm:flex-none px-4 py-3 sm:py-2 text-sm bg-ifasto-text text-ifasto-bg rounded-md font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
           >
             {t.ops.seatNext}
           </button>
@@ -406,7 +410,7 @@ function EntryRow({
   const { t } = useT();
   const waited = waitedMinutes(entry.joined_at);
   return (
-    <li className="px-6 py-3 flex items-center gap-4">
+    <li className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
       <span className="font-mono text-sm text-ifasto-secondary w-6 shrink-0">
         {position}
       </span>
@@ -434,14 +438,14 @@ function EntryRow({
         <button
           onClick={onWalk}
           disabled={busy}
-          className="px-3 py-1.5 text-xs border border-ifasto-border rounded hover:border-ifasto-text disabled:opacity-40 transition-colors"
+          className="px-4 py-2.5 text-xs border border-ifasto-border rounded-md hover:border-ifasto-text disabled:opacity-40 transition-colors"
         >
           {t.ops.walk}
         </button>
         <button
           onClick={onSeat}
           disabled={busy}
-          className="px-3 py-1.5 text-xs bg-ifasto-text text-ifasto-bg rounded font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
+          className="px-4 py-2.5 text-xs bg-ifasto-text text-ifasto-bg rounded-md font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
         >
           {t.ops.seat}
         </button>
