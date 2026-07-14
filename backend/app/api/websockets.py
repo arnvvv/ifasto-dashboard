@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.broadcast import broadcaster
-from app.auth.users import get_jwt_strategy, get_user_manager, get_user_db
+from app.auth.users import get_jwt_strategy
 from app.database import SessionLocal
 from app.models.user import User
 

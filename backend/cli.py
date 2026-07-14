@@ -22,7 +22,7 @@ import json
 import secrets
 import string
 import sys
-from datetime import timedelta, timezone
+from datetime import timezone
 from zoneinfo import ZoneInfo
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
@@ -213,7 +213,7 @@ def main() -> None:
         print(f"  email:      {args.email}")
         print(f"  password:   {pw}")
         print(f"  restaurant: {args.restaurant_name}")
-        print(f"  role:       owner")
+        print("  role:       owner")
         print("=" * 60)
         print("\n  Send the password to the operator via a secure channel.")
         print("  Have them change it after first login.\n")
