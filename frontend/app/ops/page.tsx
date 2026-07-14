@@ -22,7 +22,7 @@ import { useT } from "@/lib/LocaleContext";
 export default function OpsPage() {
   const router = useRouter();
   const { token, user, loading: authLoading, logout } = useAuth();
-  const { t } = useT();
+  const { t, locale, setLocale } = useT();
 
   // Auth gate.
   useEffect(() => {
@@ -267,6 +267,13 @@ export default function OpsPage() {
           >
             {t.ops.account}
           </a>
+          <button
+            onClick={() => setLocale(locale === "ja" ? "en" : "ja")}
+            className="ml-auto text-xs font-mono border border-ifasto-border rounded px-2.5 py-1.5 text-ifasto-secondary hover:text-ifasto-text hover:border-ifasto-text transition-colors"
+            title={locale === "ja" ? "Switch to English" : "日本語に切り替え"}
+          >
+            {locale === "ja" ? "EN" : "日本語"}
+          </button>
         </div>
       </header>
 
