@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.database import SessionLocal
 
+from app.api import contact as contact_api
 from app.api import pricing as pricing_api
 from app.api import queue as queue_api
 from app.api import reports as reports_api
@@ -34,6 +35,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://app.ifasto.com",
+        "https://ifasto.com",
+        "https://www.ifasto.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -146,3 +149,6 @@ app.include_router(reports_api.router, prefix="/api/reports", tags=["reports"])
 
 # WTP field surveys — stated-preference rows, separate from operational data.
 app.include_router(surveys_api.router, prefix="/api/surveys", tags=["surveys"])
+
+# Public contact form (marketing site) — rate-limited, honeypotted.
+app.include_router(contact_api.router, prefix="/api/contact", tags=["contact"])

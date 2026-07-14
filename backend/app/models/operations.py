@@ -161,6 +161,24 @@ class WtpSurvey(Base):
     )
 
 
+class ContactInquiry(Base):
+    """Pilot inquiries from the marketing site's contact form. Public,
+    rate-limited endpoint; the founder reads these (admin surface later)."""
+
+    __tablename__ = "contact_inquiries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    venue_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    area: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    contact: Mapped[str] = mapped_column(String(200), nullable=False)  # email or phone
+    message: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    locale: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class Transaction(Base):
     """One row per premium skip-pass sold. The dashboard does NOT collect
     customer money (Model B) — restaurant collects directly. This row is the
