@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pricingApi, formatPrice, type PriceResponse } from "@/lib/pricing";
+import { useT } from "@/lib/LocaleContext";
 
 interface LivePriceTileProps {
   token: string;
@@ -15,20 +16,20 @@ interface LivePriceTileProps {
 
 const POLL_MS = 15_000;
 
-const REASON_LABELS: Record<string, string> = {
-  premium_paused: "paused",
-  large_party_cap_reached: "cap reached",
-  engine_unavailable: "engine offline",
-  network: "offline",
-  unavailable_hard_cap: "cap reached",
-  unauthorized: "unauthorized",
-};
-
 export default function LivePriceTile({
   token,
   partySize = 2,
   active = true,
 }: LivePriceTileProps) {
+  const { t } = useT();
+  const reasonLabels: Record<string, string> = {
+    premium_paused: t.tile.paused,
+    large_party_cap_reached: t.tile.capReached,
+    engine_unavailable: t.tile.engineOffline,
+    network: t.tile.offline,
+    unavailable_hard_cap: t.tile.capReached,
+    out_of_service_hours: t.tile.engineOffline,
+  };
   const [resp, setResp] = useState<PriceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -63,17 +64,17 @@ export default function LivePriceTile({
       : "—";
 
   const sub = loading
-    ? "fetching"
+    ? t.tile.fetching
     : resp?.ok
       ? resp.quote.predicted_wait_mins != null
-        ? `~${Math.round(resp.quote.predicted_wait_mins)} min wait`
-        : "live"
-      : REASON_LABELS[resp?.reason ?? ""] ?? "unavailable";
+        ? t.tile.waitSub(Math.round(resp.quote.predicted_wait_mins))
+        : t.tile.liveSub
+      : reasonLabels[resp?.reason ?? ""] ?? t.tile.unavailable;
 
   return (
     <div>
       <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary">
-        Skip price · party {partySize}
+        {t.tile.label(partySize)}
       </p>
       <p className="font-display text-2xl mt-0.5 tabular-nums">{value}</p>
       <p className="text-[11px] text-ifasto-secondary mt-0.5">{sub}</p>

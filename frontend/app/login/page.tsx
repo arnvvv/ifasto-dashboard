@@ -4,10 +4,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useT } from "@/lib/LocaleContext";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, user, loading } = useAuth();
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -27,12 +29,12 @@ export default function LoginPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(
-          err.status === 400 || err.status === 401
-            ? "Incorrect email or password."
-            : `Login failed (${err.status}): ${err.message}`,
+          err.status === 400 || err.status === 401 || err.status === 429
+            ? t.login.badCredentials
+            : t.login.failed(err.status, err.message),
         );
       } else {
-        setError("Network error. Try again.");
+        setError(t.login.network);
       }
     } finally {
       setSubmitting(false);
@@ -44,12 +46,12 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
           <p className="font-display text-4xl tracking-tight">ifasto</p>
-          <p className="text-sm text-ifasto-secondary">Restaurant dashboard</p>
+          <p className="text-sm text-ifasto-secondary">{t.login.subtitle}</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-5">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium block">Email</label>
+            <label className="text-sm font-medium block">{t.login.email}</label>
             <input
               type="email"
               required
@@ -61,7 +63,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium block">Password</label>
+            <label className="text-sm font-medium block">{t.login.password}</label>
             <input
               type="password"
               required
@@ -81,19 +83,19 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full py-3 bg-ifasto-text text-ifasto-bg rounded-md font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            {submitting ? "Signing in…" : "Sign in"}
+            {submitting ? t.login.signingIn : t.login.signIn}
           </button>
         </form>
 
         <p className="text-xs text-ifasto-secondary text-center">
-          Accounts are issued by ifasto. Contact{" "}
+          {t.login.issuedNote}{" "}
           <a
             href="mailto:arnav@ifasto.com"
             className="text-ifasto-text hover:text-ifasto-amber transition-colors"
           >
             arnav@ifasto.com
           </a>{" "}
-          for access.
+          {t.login.issuedContact}
         </p>
       </div>
     </main>

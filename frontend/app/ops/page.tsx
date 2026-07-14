@@ -17,10 +17,12 @@ import { useQueue } from "@/lib/useQueue";
 import { pricingApi, formatPrice, type PriceResponse } from "@/lib/pricing";
 import { settingsApi, type VenueSettings } from "@/lib/settings";
 import LivePriceTile from "./LivePriceTile";
+import { useT } from "@/lib/LocaleContext";
 
 export default function OpsPage() {
   const router = useRouter();
   const { token, user, loading: authLoading, logout } = useAuth();
+  const { t } = useT();
 
   // Auth gate.
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function OpsPage() {
       });
       setSettings(next);
     } catch (err) {
-      setActionError(toMessage(err, "Could not update premium state."));
+      setActionError(toMessage(err, t.ops.errPause));
     } finally {
       setSettingsBusy(false);
     }
@@ -71,7 +73,7 @@ export default function OpsPage() {
       await queueApi.seat(token, id);
       // WS will deliver the update; refresh as a belt-and-braces fallback.
     } catch (err) {
-      setActionError(toMessage(err, "Could not seat that party."));
+      setActionError(toMessage(err, t.ops.errSeat));
       void refresh();
     } finally {
       setActionId(null);
@@ -85,7 +87,7 @@ export default function OpsPage() {
     try {
       await queueApi.walkAway(token, id);
     } catch (err) {
-      setActionError(toMessage(err, "Could not mark that party as walked away."));
+      setActionError(toMessage(err, t.ops.errWalk));
       void refresh();
     } finally {
       setActionId(null);
@@ -95,7 +97,7 @@ export default function OpsPage() {
   if (authLoading || !user) {
     return (
       <main className="flex-1 flex items-center justify-center">
-        <p className="text-sm text-ifasto-secondary">Loading…</p>
+        <p className="text-sm text-ifasto-secondary">{t.common.loading}</p>
       </main>
     );
   }
@@ -105,10 +107,10 @@ export default function OpsPage() {
       <header className="border-b border-ifasto-border px-6 py-4 flex items-center justify-between gap-4">
         <div>
           <p className="font-display text-2xl tracking-tight leading-none">
-            ifasto · ops
+            {t.ops.title}
           </p>
           <p className="text-xs text-ifasto-secondary mt-1">
-            Signed in as {user.name} · {user.role}
+            {t.ops.signedInAs(user.name)} · {t.common.roleLabel(user.role)}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -119,9 +121,9 @@ export default function OpsPage() {
               title={
                 canEditSettings
                   ? settings.premium_paused
-                    ? "Resume premium skip sales"
-                    : "Pause premium skip sales immediately"
-                  : "Owner/manager only"
+                    ? t.ops.pauseTooltipPaused
+                    : t.ops.pauseTooltipOn
+                  : t.ops.ownerOnly
               }
               className={`px-3 py-1.5 rounded-md text-xs font-mono font-medium border transition-colors ${
                 settings.premium_paused
@@ -129,54 +131,60 @@ export default function OpsPage() {
                   : "bg-emerald-50 border-emerald-200 text-emerald-700"
               } ${canEditSettings ? "hover:opacity-80" : "cursor-default opacity-70"}`}
             >
-              {settings.premium_paused ? "PREMIUM PAUSED — resume" : "PREMIUM ON — pause"}
+              {settings.premium_paused ? t.ops.premiumPaused : t.ops.premiumOn}
             </button>
           )}
           {canEditSettings && (
             <button
               onClick={() => setShowCaps((v) => !v)}
               className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
-              title="Pricing caps"
+              title={t.ops.caps}
             >
-              Caps
+              {t.ops.caps}
             </button>
           )}
+          <a
+            href="/ops/help"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+          >
+            {t.ops.help}
+          </a>
           <a
             href="/ops/history"
             className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
           >
-            History
+            {t.ops.history}
           </a>
           <a
             href="/ops/survey"
             className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
           >
-            Survey
+            {t.ops.survey}
           </a>
           <a
             href="/ops/account"
             className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
           >
-            Account
+            {t.ops.account}
           </a>
           <span
             className={`inline-flex items-center gap-1.5 text-xs font-mono ${
               connected ? "text-emerald-600" : "text-ifasto-secondary"
             }`}
-            title={connected ? "Live updates connected" : "Reconnecting…"}
+            title={connected ? t.ops.liveTooltip : t.ops.offlineTooltip}
           >
             <span
               className={`w-2 h-2 rounded-full ${
                 connected ? "bg-emerald-500" : "bg-ifasto-border"
               }`}
             />
-            {connected ? "LIVE" : "OFFLINE"}
+            {connected ? t.ops.live : t.ops.offline}
           </span>
           <button
             onClick={() => void logout()}
             className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
           >
-            Sign out
+            {t.common.signOut}
           </button>
         </div>
       </header>
@@ -194,21 +202,21 @@ export default function OpsPage() {
       )}
 
       <section className="px-6 py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-        <Stat label="Waiting" value={state?.total_waiting ?? entries.length} />
-        <Stat label="Regular" value={state?.regular_waiting ?? regular.length} />
-        <Stat label="Premium" value={state?.premium_waiting ?? premium.length} />
+        <Stat label={t.ops.tileWaiting} value={state?.total_waiting ?? entries.length} />
+        <Stat label={t.ops.tileRegular} value={state?.regular_waiting ?? regular.length} />
+        <Stat label={t.ops.tilePremium} value={state?.premium_waiting ?? premium.length} />
         <Stat
-          label="Avg wait"
+          label={t.ops.tileAvgWait}
           value={
             state?.avg_wait_minutes != null
-              ? `${Math.round(state.avg_wait_minutes)} min`
+              ? t.common.minutes(Math.round(state.avg_wait_minutes))
               : "—"
           }
         />
         {token && <LivePriceTile token={token} partySize={2} active />}
-        <Stat label="Seated today" value={state?.seated_today ?? 0} />
+        <Stat label={t.ops.tileSeatedToday} value={state?.seated_today ?? 0} />
         <Stat
-          label="Premium ¥ today"
+          label={t.ops.tilePremiumToday}
           value={formatYen(state?.premium_revenue_today ?? 0)}
           accent
         />
@@ -217,23 +225,23 @@ export default function OpsPage() {
       <section className="px-6 py-4 border-b border-ifasto-border flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary">
-            Next up
+            {t.ops.nextUp}
           </p>
           <p className="font-display text-xl truncate">
             {nextUp ? (
               <>
-                {nextUp.party_name || "Walk-in"}{" "}
+                {nextUp.party_name || t.ops.walkIn}{" "}
                 <span className="text-ifasto-secondary">
-                  · party of {nextUp.party_size}
+                  · {t.common.partyOf(nextUp.party_size)}
                 </span>
                 {nextUp.entry_type === "premium" && (
                   <span className="ml-2 text-xs font-mono text-ifasto-amber">
-                    PREMIUM
+                    {t.ops.premiumChip}
                   </span>
                 )}
               </>
             ) : (
-              <span className="text-ifasto-secondary">Queue is empty</span>
+              <span className="text-ifasto-secondary">{t.ops.queueEmpty}</span>
             )}
           </p>
         </div>
@@ -242,14 +250,14 @@ export default function OpsPage() {
             onClick={() => setShowAdd(true)}
             className="px-4 py-2 text-sm border border-ifasto-border rounded-md hover:border-ifasto-text transition-colors"
           >
-            + Add party
+            {t.ops.addParty}
           </button>
           <button
             onClick={() => nextUp && handleSeat(nextUp.id)}
             disabled={!nextUp || actionId === nextUp?.id}
             className="px-4 py-2 text-sm bg-ifasto-text text-ifasto-bg rounded-md font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
           >
-            Seat next
+            {t.ops.seatNext}
           </button>
         </div>
       </section>
@@ -262,20 +270,20 @@ export default function OpsPage() {
 
       <section className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-ifasto-border">
         <QueueColumn
-          title="Premium"
+          title={t.ops.colPremium}
           tone="amber"
           entries={premium}
-          empty="No premium parties."
+          empty={t.ops.emptyPremium}
           actionId={actionId}
           onSeat={handleSeat}
           onWalk={handleWalk}
           loading={loading}
         />
         <QueueColumn
-          title="Regular"
+          title={t.ops.colRegular}
           tone="text"
           entries={regular}
-          empty="No regular parties."
+          empty={t.ops.emptyRegular}
           actionId={actionId}
           onSeat={handleSeat}
           onWalk={handleWalk}
@@ -347,6 +355,7 @@ function QueueColumn({
   onWalk,
   loading,
 }: QueueColumnProps) {
+  const { t } = useT();
   const titleColor = tone === "amber" ? "text-ifasto-amber" : "text-ifasto-text";
 
   return (
@@ -361,7 +370,7 @@ function QueueColumn({
       </div>
       <ul className="flex-1 divide-y divide-ifasto-border">
         {loading && entries.length === 0 ? (
-          <li className="px-6 py-8 text-sm text-ifasto-secondary">Loading…</li>
+          <li className="px-6 py-8 text-sm text-ifasto-secondary">{t.common.loading}</li>
         ) : entries.length === 0 ? (
           <li className="px-6 py-8 text-sm text-ifasto-secondary">{empty}</li>
         ) : (
@@ -394,6 +403,7 @@ function EntryRow({
   onSeat: () => void;
   onWalk: () => void;
 }) {
+  const { t } = useT();
   const waited = waitedMinutes(entry.joined_at);
   return (
     <li className="px-6 py-3 flex items-center gap-4">
@@ -402,13 +412,13 @@ function EntryRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">
-          {entry.party_name || "Walk-in"}{" "}
+          {entry.party_name || t.ops.walkIn}{" "}
           <span className="text-ifasto-secondary font-normal">
             · {entry.party_size}
           </span>
         </p>
         <p className="text-xs text-ifasto-secondary mt-0.5">
-          waited {waited} min
+          {t.ops.waited(waited)}
           {entry.phone && <> · {entry.phone}</>}
           {entry.skip_price != null && (
             <> · ¥{entry.skip_price.toLocaleString()}</>
@@ -426,14 +436,14 @@ function EntryRow({
           disabled={busy}
           className="px-3 py-1.5 text-xs border border-ifasto-border rounded hover:border-ifasto-text disabled:opacity-40 transition-colors"
         >
-          Walk
+          {t.ops.walk}
         </button>
         <button
           onClick={onSeat}
           disabled={busy}
           className="px-3 py-1.5 text-xs bg-ifasto-text text-ifasto-bg rounded font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
         >
-          Seat
+          {t.ops.seat}
         </button>
       </div>
     </li>
@@ -449,6 +459,7 @@ function AddPartyModal({
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const { t } = useT();
   const [partySize, setPartySize] = useState(2);
   const [entryType, setEntryType] = useState<"regular" | "premium">("regular");
   const [partyName, setPartyName] = useState("");
@@ -517,7 +528,7 @@ function AddPartyModal({
       await queueApi.add(token, body);
       onAdded();
     } catch (e) {
-      setErr(toMessage(e, "Could not add the party."));
+      setErr(toMessage(e, t.ops.errAdd));
       setSubmitting(false);
     }
   }
@@ -533,18 +544,18 @@ function AddPartyModal({
         className="bg-ifasto-bg w-full max-w-md rounded-lg border border-ifasto-border p-6 space-y-4"
       >
         <div className="flex items-center justify-between">
-          <p className="font-display text-xl">Add to queue</p>
+          <p className="font-display text-xl">{t.modal.title}</p>
           <button
             type="button"
             onClick={onClose}
             className="text-ifasto-secondary hover:text-ifasto-text text-sm"
           >
-            Close
+            {t.common.close}
           </button>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Party size">
+          <Field label={t.modal.partySize}>
             <input
               type="number"
               min={1}
@@ -555,7 +566,7 @@ function AddPartyModal({
               className="w-full px-3 py-2 bg-white border border-ifasto-border rounded-md text-base focus:outline-none focus:border-ifasto-text"
             />
           </Field>
-          <Field label="Type">
+          <Field label={t.modal.type}>
             <select
               value={entryType}
               onChange={(e) =>
@@ -563,13 +574,13 @@ function AddPartyModal({
               }
               className="w-full px-3 py-2 bg-white border border-ifasto-border rounded-md text-base focus:outline-none focus:border-ifasto-text"
             >
-              <option value="regular">Regular</option>
-              <option value="premium">Premium (skip)</option>
+              <option value="regular">{t.modal.typeRegular}</option>
+              <option value="premium">{t.modal.typePremium}</option>
             </select>
           </Field>
         </div>
 
-        <Field label="Name (optional)">
+        <Field label={t.modal.name}>
           <input
             type="text"
             value={partyName}
@@ -578,7 +589,7 @@ function AddPartyModal({
           />
         </Field>
 
-        <Field label="Phone (optional)">
+        <Field label={t.modal.phone}>
           <input
             type="tel"
             value={phone}
@@ -587,7 +598,7 @@ function AddPartyModal({
           />
         </Field>
 
-        <Field label="Notes (optional)">
+        <Field label={t.modal.notes}>
           <input
             type="text"
             value={notes}
@@ -600,25 +611,25 @@ function AddPartyModal({
           <>
             <div className="text-xs font-mono px-3 py-2 rounded-md bg-ifasto-bg border border-ifasto-border">
               {quoteLoading ? (
-                <span className="text-ifasto-secondary">Fetching live quote…</span>
+                <span className="text-ifasto-secondary">{t.modal.fetchingQuote}</span>
               ) : quote?.ok ? (
                 <span>
-                  Engine quote:{" "}
+                  {t.modal.engineQuote}{" "}
                   <span className="font-semibold">{formatPrice(quote.quote)}</span>
                   {quote.quote.predicted_wait_mins != null && (
                     <span className="text-ifasto-secondary">
-                      {" "}· ~{Math.round(quote.quote.predicted_wait_mins)} min wait
+                      {" "}· {t.modal.quoteWait(Math.round(quote.quote.predicted_wait_mins))}
                     </span>
                   )}
-                  <span className="text-ifasto-secondary"> · locked 5 min</span>
+                  <span className="text-ifasto-secondary"> · {t.modal.quoteLocked}</span>
                 </span>
               ) : (
                 <span className="text-amber-700">
-                  No live quote ({quote?.message ?? "unavailable"}) — enter price manually
+                  {t.modal.noQuote(quote?.message ?? t.tile.unavailable)}
                 </span>
               )}
             </div>
-            <Field label="Skip price (¥ charged to guest)">
+            <Field label={t.modal.skipPrice}>
               <input
                 type="number"
                 min={0}
@@ -641,7 +652,7 @@ function AddPartyModal({
           disabled={submitting}
           className="w-full py-2.5 bg-ifasto-text text-ifasto-bg rounded-md font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
-          {submitting ? "Adding…" : "Add to queue"}
+          {submitting ? t.modal.submitting : t.modal.submit}
         </button>
       </form>
     </div>
@@ -676,6 +687,7 @@ function CapsDrawer({
   onSaved: (s: VenueSettings) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [sharePct, setSharePct] = useState(String(Math.round(settings.max_premium_share * 100)));
   const [ceiling, setCeiling] = useState(String(settings.price_ceiling));
   const [maxEligible, setMaxEligible] = useState(String(settings.max_party_size_eligible));
@@ -695,35 +707,35 @@ function CapsDrawer({
       });
       onSaved(next);
     } catch (e) {
-      setErr(toMessage(e, "Could not save caps."));
+      setErr(toMessage(e, t.caps.errSave));
       setBusy(false);
     }
   }
 
   return (
     <section className="px-6 py-4 border-b border-ifasto-border bg-ifasto-bg/60 flex flex-wrap items-end gap-4">
-      <Field label="Max premium share (%)">
+      <Field label={t.caps.maxShare}>
         <input
           type="number" min={1} max={50} value={sharePct}
           onChange={(e) => setSharePct(e.target.value)}
           className="w-28 px-3 py-2 bg-white border border-ifasto-border rounded-md text-sm focus:outline-none focus:border-ifasto-text"
         />
       </Field>
-      <Field label="Price ceiling (¥)">
+      <Field label={t.caps.ceiling}>
         <input
           type="number" min={100} step={500} value={ceiling}
           onChange={(e) => setCeiling(e.target.value)}
           className="w-32 px-3 py-2 bg-white border border-ifasto-border rounded-md text-sm focus:outline-none focus:border-ifasto-text"
         />
       </Field>
-      <Field label="Max party size eligible">
+      <Field label={t.caps.maxEligible}>
         <input
           type="number" min={1} max={20} value={maxEligible}
           onChange={(e) => setMaxEligible(e.target.value)}
           className="w-28 px-3 py-2 bg-white border border-ifasto-border rounded-md text-sm focus:outline-none focus:border-ifasto-text"
         />
       </Field>
-      <Field label="Large-party skips / service">
+      <Field label={t.caps.largeCap}>
         <input
           type="number" min={0} max={50} value={largeCap}
           onChange={(e) => setLargeCap(e.target.value)}
@@ -736,13 +748,13 @@ function CapsDrawer({
           disabled={busy}
           className="px-4 py-2 text-sm bg-ifasto-text text-ifasto-bg rounded-md font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
-          {busy ? "Saving…" : "Save caps"}
+          {busy ? t.common.saving : t.caps.saveCaps}
         </button>
         <button
           onClick={onClose}
           className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
         >
-          Cancel
+          {t.common.cancel}
         </button>
       </div>
       {err && <p className="text-sm text-red-600 w-full">{err}</p>}

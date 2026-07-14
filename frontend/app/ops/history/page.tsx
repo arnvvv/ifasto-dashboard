@@ -10,13 +10,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { reportsApi, type DailyReport } from "@/lib/reports";
+import { useT } from "@/lib/LocaleContext";
 
 function yen(n: number): string {
   return `¥${n.toLocaleString()}`;
 }
 
-function delta(now: number, prior: number): string {
-  if (prior === 0) return now > 0 ? "new" : "·";
+function delta(now: number, prior: number, newLabel = "new"): string {
+  if (prior === 0) return now > 0 ? newLabel : "·";
   const pct = Math.round(((now - prior) / prior) * 100);
   return `${pct >= 0 ? "+" : ""}${pct}%`;
 }
@@ -24,6 +25,7 @@ function delta(now: number, prior: number): string {
 export default function HistoryPage() {
   const router = useRouter();
   const { token, user, loading: authLoading } = useAuth();
+  const { t } = useT();
   const [report, setReport] = useState<DailyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,13 +38,13 @@ export default function HistoryPage() {
     reportsApi
       .daily(token, 28)
       .then(setReport)
-      .catch(() => setError("Could not load the report."));
+      .catch(() => setError(t.history.errLoad));
   }, [token]);
 
   if (authLoading || !user) {
     return (
       <main className="flex-1 flex items-center justify-center">
-        <p className="text-sm text-ifasto-secondary">Loading…</p>
+        <p className="text-sm text-ifasto-secondary">{t.common.loading}</p>
       </main>
     );
   }
@@ -55,42 +57,42 @@ export default function HistoryPage() {
       <header className="border-b border-ifasto-border px-6 py-4 flex items-center justify-between gap-4">
         <div>
           <p className="font-display text-2xl tracking-tight leading-none">
-            ifasto · history
+            {t.history.title}
           </p>
           <p className="text-xs text-ifasto-secondary mt-1">
-            Last {report?.days ?? 28} days · JST
+            {t.history.subtitle(report?.days ?? 28)}
           </p>
         </div>
         <Link
           href="/ops"
           className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
         >
-          ← Live board
+          {t.history.backToBoard}
         </Link>
       </header>
 
       {tw && pw && (
         <section className="px-6 py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Stat label="Seated (7d)" value={tw.seated} sub={delta(tw.seated, pw.seated)} />
+          <Stat label={t.history.seated7} value={tw.seated} sub={delta(tw.seated, pw.seated, t.history.newBadge)} />
           <Stat
-            label="Walk-aways (7d)"
+            label={t.history.walked7}
             value={tw.walked_away}
-            sub={delta(tw.walked_away, pw.walked_away)}
+            sub={delta(tw.walked_away, pw.walked_away, t.history.newBadge)}
             subInverted
           />
-          <Stat label="Premium sold (7d)" value={tw.premium_sold} sub={delta(tw.premium_sold, pw.premium_sold)} />
+          <Stat label={t.history.premiumSold7} value={tw.premium_sold} sub={delta(tw.premium_sold, pw.premium_sold, t.history.newBadge)} />
           <Stat
-            label="Premium ¥ (7d)"
+            label={t.history.premiumRevenue7}
             value={yen(tw.premium_revenue)}
-            sub={delta(tw.premium_revenue, pw.premium_revenue)}
+            sub={delta(tw.premium_revenue, pw.premium_revenue, t.history.newBadge)}
             accent
           />
           <Stat
-            label="Median wait (7d)"
-            value={tw.median_wait_mins != null ? `${tw.median_wait_mins} min` : "—"}
+            label={t.history.medianWait7}
+            value={tw.median_wait_mins != null ? `${tw.median_wait_mins} ${t.history.min}` : "—"}
             sub={
               pw.median_wait_mins != null && tw.median_wait_mins != null
-                ? `${tw.median_wait_mins <= pw.median_wait_mins ? "" : "+"}${(tw.median_wait_mins - pw.median_wait_mins).toFixed(0)} min WoW`
+                ? `${tw.median_wait_mins <= pw.median_wait_mins ? "" : "+"}${(tw.median_wait_mins - pw.median_wait_mins).toFixed(0)}${t.history.wowSuffix}`
                 : "·"
             }
           />
@@ -101,20 +103,20 @@ export default function HistoryPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         {report && report.rows.length === 0 && (
           <p className="text-sm text-ifasto-secondary">
-            No activity in the window yet. Rows appear as soon as the queue is used.
+            {t.history.empty}
           </p>
         )}
         {report && report.rows.length > 0 && (
           <table className="w-full text-sm min-w-[760px]">
             <thead>
               <tr className="text-left text-xs font-mono uppercase tracking-widest text-ifasto-secondary border-b border-ifasto-border">
-                <th className="py-2 pr-4">Date</th>
-                <th className="py-2 pr-4">Seated</th>
-                <th className="py-2 pr-4">Walked</th>
-                <th className="py-2 pr-4">Premium</th>
-                <th className="py-2 pr-4">Premium ¥</th>
-                <th className="py-2 pr-4">Median wait</th>
-                <th className="py-2 pr-4">Premium saves</th>
+                <th className="py-2 pr-4">{t.history.colDate}</th>
+                <th className="py-2 pr-4">{t.history.colSeated}</th>
+                <th className="py-2 pr-4">{t.history.colWalked}</th>
+                <th className="py-2 pr-4">{t.history.colPremium}</th>
+                <th className="py-2 pr-4">{t.history.colPremiumRevenue}</th>
+                <th className="py-2 pr-4">{t.history.colMedianWait}</th>
+                <th className="py-2 pr-4">{t.history.colPremiumSaves}</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +128,7 @@ export default function HistoryPage() {
                   }`}
                   title={
                     r.walkaway_spike
-                      ? "Walk-away spike vs window average — check whether premium pressure is hurting the regular line"
+                      ? t.history.spikeTooltip
                       : undefined
                   }
                 >
@@ -136,18 +138,18 @@ export default function HistoryPage() {
                     {r.walked_away}
                     {r.walkaway_spike && (
                       <span className="ml-1.5 text-[10px] font-mono text-amber-700">
-                        SPIKE
+                        {t.history.spike}
                       </span>
                     )}
                   </td>
                   <td className="py-2 pr-4">{r.premium_sold}</td>
                   <td className="py-2 pr-4 font-mono">{yen(r.premium_revenue)}</td>
                   <td className="py-2 pr-4">
-                    {r.median_wait_mins != null ? `${r.median_wait_mins} min` : "—"}
+                    {r.median_wait_mins != null ? `${r.median_wait_mins} ${t.history.min}` : "—"}
                   </td>
                   <td className="py-2 pr-4">
                     {r.premium_wait_saving_mins != null
-                      ? `${r.premium_wait_saving_mins} min`
+                      ? `${r.premium_wait_saving_mins} ${t.history.min}`
                       : "—"}
                   </td>
                 </tr>
