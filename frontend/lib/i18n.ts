@@ -137,6 +137,7 @@ export interface Dict {
     waitSub: (mins: number) => string;
     paused: string;
     capReached: string;
+    outOfHours: string;
     engineOffline: string;
     offline: string;
     unavailable: string;
@@ -304,6 +305,7 @@ export const ja: Dict = {
     waitSub: (m) => `予測待ち 約${m}分`,
     paused: "停止中",
     capReached: "上限到達",
+    outOfHours: "営業時間外",
     engineOffline: "エンジン停止",
     offline: "オフライン",
     unavailable: "取得不可",
@@ -471,6 +473,7 @@ export const en: Dict = {
     waitSub: (m) => `~${m} min wait`,
     paused: "paused",
     capReached: "cap reached",
+    outOfHours: "outside service hours",
     engineOffline: "engine offline",
     offline: "offline",
     unavailable: "unavailable",

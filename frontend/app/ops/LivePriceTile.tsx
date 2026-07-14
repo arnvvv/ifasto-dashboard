@@ -28,7 +28,7 @@ export default function LivePriceTile({
     engine_unavailable: t.tile.engineOffline,
     network: t.tile.offline,
     unavailable_hard_cap: t.tile.capReached,
-    out_of_service_hours: t.tile.engineOffline,
+    out_of_service_hours: t.tile.outOfHours,
   };
   const [resp, setResp] = useState<PriceResponse | null>(null);
   const [loading, setLoading] = useState(true);

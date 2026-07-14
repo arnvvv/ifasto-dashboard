@@ -758,7 +758,17 @@ function AddPartyModal({
                 </span>
               ) : (
                 <span className="text-amber-700">
-                  {t.modal.noQuote(quote?.message ?? t.tile.unavailable)}
+                  {t.modal.noQuote(
+                    quote && !quote.ok
+                      ? ({
+                          premium_paused: t.tile.paused,
+                          large_party_cap_reached: t.tile.capReached,
+                          out_of_service_hours: t.tile.outOfHours,
+                          engine_unavailable: t.tile.engineOffline,
+                          unavailable_hard_cap: t.tile.capReached,
+                        }[quote.reason] ?? quote.message)
+                      : t.tile.unavailable,
+                  )}
                 </span>
               )}
             </div>
