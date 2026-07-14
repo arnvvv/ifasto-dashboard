@@ -1,7 +1,14 @@
 """ifasto dashboard backend — FastAPI entry point."""
 
-from fastapi import Depends, FastAPI
+import time
+from collections import defaultdict, deque
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+
+from app.database import SessionLocal
 
 from app.api import pricing as pricing_api
 from app.api import queue as queue_api
@@ -34,9 +41,69 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------------------------
+# Production hardening: security headers on every API response, and a
+# brute-force limiter on the login endpoint. In-memory state is fine — the
+# service runs a single uvicorn worker (same constraint as the WS broadcaster).
+# ---------------------------------------------------------------------------
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+    "Cache-Control": "no-store",  # API responses carry queue/pricing data
+}
+
+LOGIN_WINDOW_S = 300
+LOGIN_MAX_ATTEMPTS = 10
+_login_attempts: dict[str, deque] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def security_and_login_limit(request: Request, call_next):
+    # Rate-limit the password login endpoint per client IP (10 per 5 min).
+    if request.url.path == "/api/auth/jwt/login" and request.method == "POST":
+        # Nginx sits in front; X-Forwarded-For's first hop is the client.
+        fwd = request.headers.get("x-forwarded-for", "")
+        ip = fwd.split(",")[0].strip() or (request.client.host if request.client else "unknown")
+        now = time.monotonic()
+        bucket = _login_attempts[ip]
+        while bucket and now - bucket[0] > LOGIN_WINDOW_S:
+            bucket.popleft()
+        if len(bucket) >= LOGIN_MAX_ATTEMPTS:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many login attempts. Try again in a few minutes."},
+                headers=_SECURITY_HEADERS,
+            )
+        bucket.append(now)
+        # Opportunistic cleanup so the map can't grow unbounded.
+        if len(_login_attempts) > 10_000:
+            _login_attempts.clear()
+
+    response = await call_next(request)
+    for k, v in _SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    return response
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "ifasto-dashboard-backend"}
+    """Deep health: verifies the database answers, not just that the process
+    is alive. The hourly monitoring routine alerts on non-200."""
+    try:
+        async with SessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+    body = {
+        "status": "ok" if db_ok else "degraded",
+        "service": "ifasto-dashboard-backend",
+        "db": "ok" if db_ok else "unreachable",
+    }
+    return JSONResponse(status_code=200 if db_ok else 503, content=body)
 
 
 @app.get("/api/me", response_model=UserRead)
