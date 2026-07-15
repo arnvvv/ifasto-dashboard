@@ -33,3 +33,23 @@ class DailyReport(BaseModel):
     rows: list[DailyRow]
     this_week: WeekComparison
     prior_week: WeekComparison
+
+
+class StatementLine(BaseModel):
+    date: str  # JST date of sale, ISO
+    time: str  # JST HH:MM
+    ticket_no: int | None
+    party_size: int
+    gross_amount: int  # yen
+    restaurant_share: int  # 70%
+    ifasto_fee: int  # 30%
+
+
+class MonthlyStatement(BaseModel):
+    month: str  # YYYY-MM (JST)
+    venue_name: str
+    lines: list[StatementLine]
+    passes_sold: int
+    gross_total: int
+    restaurant_total: int
+    ifasto_total: int

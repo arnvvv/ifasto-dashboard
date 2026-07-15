@@ -212,6 +212,28 @@ export interface Dict {
     leaveYes: string;
     leaveNo: string;
     poweredBy: string;
+    fastPass: string;
+    paid: (amount: string) => string;
+  };
+  statement: {
+    title: string;
+    subtitle: string;
+    backToBoard: string;
+    print: string;
+    colDate: string;
+    colTime: string;
+    colTicket: string;
+    colParty: string;
+    colGross: string;
+    colRestaurant: string;
+    colIfasto: string;
+    passesSold: string;
+    grossTotal: string;
+    restaurantTotal: string;
+    ifastoTotal: string;
+    empty: string;
+    errLoad: string;
+    note: string;
   };
   qrSign: {
     title: string;
@@ -422,6 +444,28 @@ export const ja: Dict = {
     leaveYes: "取り消す",
     leaveNo: "戻る",
     poweredBy: "Powered by ifasto",
+    fastPass: "ファストパス",
+    paid: (amount) => `お支払い済み ${amount}`,
+  },
+  statement: {
+    title: "月次明細",
+    subtitle: "ファストパス販売と手数料の内訳",
+    backToBoard: "← ボードへ戻る",
+    print: "印刷する",
+    colDate: "日付",
+    colTime: "時刻",
+    colTicket: "整理券",
+    colParty: "人数",
+    colGross: "販売額",
+    colRestaurant: "店舗分（70%）",
+    colIfasto: "ifasto手数料（30%）",
+    passesSold: "販売数",
+    grossTotal: "販売合計",
+    restaurantTotal: "店舗受取合計",
+    ifastoTotal: "ifasto請求額",
+    empty: "この月の販売はありません。",
+    errLoad: "明細を読み込めませんでした。",
+    note: "ファストパス代金は貴店が直接お客様から受け取ります。ifastoは月末に手数料分のみ請求いたします。",
   },
   qrSign: {
     title: "店頭QRサイン",
@@ -631,6 +675,28 @@ export const en: Dict = {
     leaveYes: "Leave",
     leaveNo: "Stay",
     poweredBy: "Powered by ifasto",
+    fastPass: "Fast pass",
+    paid: (amount) => `Paid ${amount}`,
+  },
+  statement: {
+    title: "Monthly statement",
+    subtitle: "Fast-pass sales and fee breakdown",
+    backToBoard: "← Live board",
+    print: "Print",
+    colDate: "Date",
+    colTime: "Time",
+    colTicket: "Ticket",
+    colParty: "Party",
+    colGross: "Sale",
+    colRestaurant: "Venue share (70%)",
+    colIfasto: "ifasto fee (30%)",
+    passesSold: "Passes sold",
+    grossTotal: "Gross total",
+    restaurantTotal: "Venue total",
+    ifastoTotal: "ifasto invoice",
+    empty: "No sales this month.",
+    errLoad: "Could not load the statement.",
+    note: "Guests pay the venue directly for fast passes. ifasto invoices only the fee at month end.",
   },
   qrSign: {
     title: "Door QR sign",

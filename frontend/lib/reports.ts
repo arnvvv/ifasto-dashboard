@@ -36,3 +36,31 @@ export const reportsApi = {
   daily: (token: string, days = 28) =>
     api<DailyReport>(`/api/reports/daily?days=${days}`, { token }),
 };
+
+export interface StatementLine {
+  date: string;
+  time: string;
+  ticket_no: number | null;
+  party_size: number;
+  gross_amount: number;
+  restaurant_share: number;
+  ifasto_fee: number;
+}
+
+export interface MonthlyStatement {
+  month: string;
+  venue_name: string;
+  lines: StatementLine[];
+  passes_sold: number;
+  gross_total: number;
+  restaurant_total: number;
+  ifasto_total: number;
+}
+
+export const statementApi = {
+  get: (token: string, month?: string) =>
+    api<MonthlyStatement>(
+      `/api/reports/statement${month ? `?month=${month}` : ""}`,
+      { token }
+    ),
+};

@@ -63,12 +63,22 @@ export default function HistoryPage() {
             {t.history.subtitle(report?.days ?? 28)}
           </p>
         </div>
-        <Link
-          href="/ops"
-          className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
-        >
-          {t.history.backToBoard}
-        </Link>
+        <div className="flex items-center gap-4">
+          {(user.role === "owner" || user.role === "manager") && (
+            <Link
+              href="/ops/statement"
+              className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+            >
+              {t.statement.title}
+            </Link>
+          )}
+          <Link
+            href="/ops"
+            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors"
+          >
+            {t.history.backToBoard}
+          </Link>
+        </div>
       </header>
 
       {tw && pw && (

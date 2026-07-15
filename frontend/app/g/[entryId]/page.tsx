@@ -103,6 +103,18 @@ export default function GuestTicketPage() {
           <h1 className="font-display text-2xl tracking-tight mb-8">{t.guest.ticketTitle}</h1>
 
           <div className="bg-white border border-ifasto-border rounded-lg p-8 text-center mb-6">
+            {entry.entry_type === "premium" && (
+              <div className="mb-4">
+                <span className="inline-block px-3 py-1 rounded-full bg-ifasto-amber text-sm font-medium">
+                  {t.guest.fastPass}
+                </span>
+                {entry.paid_amount !== null && (
+                  <p className="text-sm text-ifasto-secondary mt-2">
+                    {t.guest.paid(`¥${entry.paid_amount.toLocaleString()}`)}
+                  </p>
+                )}
+              </div>
+            )}
             <p className="font-mono text-6xl text-ifasto-text mb-2">
               {t.guest.ticketNo(entry.ticket_no)}
             </p>

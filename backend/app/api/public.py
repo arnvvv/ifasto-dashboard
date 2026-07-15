@@ -80,6 +80,10 @@ def _entry_public_view(entry: QueueEntry, parties_ahead: int, venue: Restaurant)
         "est_remaining_mins": remaining,
         "venue_name": venue.name,
         "venue_name_ja": venue.name_ja,
+        # Receipt fields: staff-sold fast passes surface as purchase proof on
+        # the guest ticket page (Model B — the restaurant collected the money).
+        "entry_type": entry.entry_type.value,
+        "paid_amount": entry.skip_price if entry.entry_type == QueueEntryType.premium else None,
     }
 
 

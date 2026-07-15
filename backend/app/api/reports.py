@@ -19,16 +19,23 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.users import current_active_user
+from app.auth.users import current_active_user, require_role
 from app.database import get_session
+from app.models.restaurant import Restaurant
 from app.models.operations import (
     QueueEntry,
     QueueEntryStatus,
     QueueEntryType,
     Transaction,
 )
-from app.models.user import User
-from app.schemas.reports import DailyReport, DailyRow, WeekComparison
+from app.models.user import User, UserRole
+from app.schemas.reports import (
+    DailyReport,
+    DailyRow,
+    MonthlyStatement,
+    StatementLine,
+    WeekComparison,
+)
 
 router = APIRouter()
 
@@ -153,4 +160,59 @@ async def daily_report(
         rows=rows,
         this_week=_week(0),
         prior_week=_week(7),
+    )
+
+
+@router.get("/statement", response_model=MonthlyStatement)
+async def monthly_statement(
+    month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    user: User = Depends(require_role(UserRole.owner, UserRole.manager)),
+    session: AsyncSession = Depends(get_session),
+) -> MonthlyStatement:
+    """Month-to-date (or a past month's) fast-pass sales with the 70/30
+    split — the invoicing artifact for Model B. Restaurant collected the
+    gross directly; ifasto invoices ifasto_total at month end."""
+    now_jst = datetime.now(JST)
+    month_str = month or now_jst.strftime("%Y-%m")
+    year, mon = int(month_str[:4]), int(month_str[5:7])
+
+    # JST month bounds converted to UTC for the created_at filter.
+    start_jst = datetime(year, mon, 1, tzinfo=JST)
+    end_jst = datetime(year + 1, 1, 1, tzinfo=JST) if mon == 12 else datetime(year, mon + 1, 1, tzinfo=JST)
+
+    stmt = (
+        select(Transaction, QueueEntry)
+        .join(QueueEntry, Transaction.queue_entry_id == QueueEntry.id)
+        .where(
+            Transaction.restaurant_id == user.restaurant_id,
+            Transaction.created_at >= start_jst.astimezone(timezone.utc),
+            Transaction.created_at < end_jst.astimezone(timezone.utc),
+        )
+        .order_by(Transaction.created_at)
+    )
+    rows = (await session.execute(stmt)).all()
+    venue = await session.get(Restaurant, user.restaurant_id)
+
+    lines: list[StatementLine] = []
+    for tx, entry in rows:
+        created = tx.created_at if tx.created_at.tzinfo else tx.created_at.replace(tzinfo=timezone.utc)
+        local = created.astimezone(JST)
+        lines.append(StatementLine(
+            date=local.date().isoformat(),
+            time=local.strftime("%H:%M"),
+            ticket_no=entry.ticket_no,
+            party_size=entry.party_size,
+            gross_amount=tx.gross_amount,
+            restaurant_share=tx.restaurant_share,
+            ifasto_fee=tx.ifasto_fee,
+        ))
+
+    return MonthlyStatement(
+        month=month_str,
+        venue_name=(venue.name_ja or venue.name) if venue else "",
+        lines=lines,
+        passes_sold=len(lines),
+        gross_total=sum(l.gross_amount for l in lines),
+        restaurant_total=sum(l.restaurant_share for l in lines),
+        ifasto_total=sum(l.ifasto_fee for l in lines),
     )

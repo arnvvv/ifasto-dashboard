@@ -19,6 +19,8 @@ export interface PublicEntry {
   est_remaining_mins: number | null;
   venue_name: string;
   venue_name_ja: string | null;
+  entry_type: "regular" | "premium";
+  paid_amount: number | null;
 }
 
 export class PublicApiError extends Error {
