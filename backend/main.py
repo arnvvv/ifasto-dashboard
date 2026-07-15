@@ -12,6 +12,7 @@ from app.database import SessionLocal
 
 from app.api import contact as contact_api
 from app.api import pricing as pricing_api
+from app.api import admin as admin_api
 from app.api import public as public_api
 from app.api import queue as queue_api
 from app.api import reports as reports_api
@@ -167,3 +168,6 @@ app.include_router(contact_api.router, prefix="/api/contact", tags=["contact"])
 
 # Public guest QR flow — join + status, no auth, rate-limited.
 app.include_router(public_api.router, prefix="/api/public", tags=["public"])
+
+# Founder admin — superuser only (cross-venue overview).
+app.include_router(admin_api.router, prefix="/api/admin", tags=["admin"])

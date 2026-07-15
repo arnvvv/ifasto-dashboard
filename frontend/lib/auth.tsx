@@ -28,6 +28,7 @@ export interface CurrentUser {
   restaurant_id: string;
   is_active: boolean;
   is_verified: boolean;
+  is_superuser?: boolean;
 }
 
 interface AuthCtx {

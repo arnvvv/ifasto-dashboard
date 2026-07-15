@@ -136,6 +136,8 @@ async def export_training_data(out_path: str | None, include_test: bool) -> int:
                 "queue_ahead_premium": e.queue_ahead_premium,
                 "queue_pressure_at_join": e.queue_pressure_at_join,
                 "predicted_wait_at_join": e.predicted_wait_at_join,
+                "predicted_wait_p10_at_join": e.predicted_wait_p10_at_join,
+                "predicted_wait_p90_at_join": e.predicted_wait_p90_at_join,
                 "prediction_request_id": e.prediction_request_id,
                 # Money (premium)
                 "skip_price": e.skip_price,
@@ -178,6 +180,15 @@ async def rotate_qr(restaurant_name: str) -> str:
         return venue.qr_token
 
 
+async def set_superuser(email: str, enabled: bool) -> None:
+    async with SessionLocal() as session:
+        u = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if u is None:
+            raise SystemExit(f"no user with email {email!r}")
+        u.is_superuser = enabled
+        await session.commit()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cli.py", description="ifasto admin CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -211,7 +222,16 @@ def main() -> None:
     )
     rq.add_argument("--restaurant-name", required=True)
 
+    su = sub.add_parser("set-superuser", help="Grant/revoke founder admin (cross-venue overview)")
+    su.add_argument("--email", required=True)
+    su.add_argument("--revoke", action="store_true")
+
     args = parser.parse_args()
+
+    if args.cmd == "set-superuser":
+        asyncio.run(set_superuser(args.email, not args.revoke))
+        print(f"{args.email}: is_superuser={'False' if args.revoke else 'True'}")
+        return
 
     if args.cmd == "rotate-qr":
         token = asyncio.run(rotate_qr(args.restaurant_name))

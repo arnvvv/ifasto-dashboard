@@ -273,6 +273,14 @@ export default function OpsPage() {
           >
             {t.ops.account}
           </a>
+          {user.is_superuser && (
+            <a
+              href="/ops/admin"
+              className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
+            >
+              Admin
+            </a>
+          )}
           <button
             onClick={() => setLocale(locale === "ja" ? "en" : "ja")}
             className="ml-auto text-xs font-mono border border-ifasto-border rounded px-2.5 py-1.5 text-ifasto-secondary hover:text-ifasto-text hover:border-ifasto-text transition-colors"
