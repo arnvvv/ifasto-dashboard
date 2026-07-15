@@ -16,7 +16,6 @@ export interface PublicEntry {
   status: "waiting" | "seated" | "walked_away";
   party_size: number;
   parties_ahead: number;
-  called: boolean;
   est_remaining_mins: number | null;
   est_remaining_p10: number | null;
   est_remaining_p90: number | null;

@@ -33,7 +33,6 @@ class QueueEntryRead(BaseModel):
     joined_at: datetime
     seated_at: datetime | None
     walked_away_at: datetime | None = None
-    called_at: datetime | None = None
     status: QueueEntryStatus
     skip_price: int | None
     quoted_price: int | None = None

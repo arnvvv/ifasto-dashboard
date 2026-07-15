@@ -67,10 +67,6 @@ class QueueEntry(Base):
     )
     seated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     walked_away_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # Set while the party is being called to the front (still status=waiting,
-    # so every queue count and snapshot stays untouched). Cleared by uncall.
-    # Also a label: called_at -> seated_at gap measures guest response time.
-    called_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[QueueEntryStatus] = mapped_column(
         Enum(QueueEntryStatus), default=QueueEntryStatus.waiting, nullable=False
     )

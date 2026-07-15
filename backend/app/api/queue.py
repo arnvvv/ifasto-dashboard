@@ -298,47 +298,6 @@ async def seat_entry(
     return entry
 
 
-@router.patch("/entries/{entry_id}/call", response_model=QueueEntryRead)
-async def call_entry(
-    entry_id: uuid.UUID,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_session),
-) -> QueueEntry:
-    """呼び出し — flag the party as being called. Status stays waiting so
-    queue counts and snapshots are untouched; the guest ticket page flips to
-    its attention screen within one poll."""
-    entry = await _get_entry_scoped(session, entry_id, user.restaurant_id)
-    if entry.status != QueueEntryStatus.waiting:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Entry is already {entry.status.value}, cannot call.",
-        )
-    entry.called_at = datetime.now(timezone.utc)
-    await session.commit()
-    await session.refresh(entry)
-    await _broadcast(session, user.restaurant_id, "called", entry)
-    return entry
-
-
-@router.patch("/entries/{entry_id}/uncall", response_model=QueueEntryRead)
-async def uncall_entry(
-    entry_id: uuid.UUID,
-    user: User = Depends(current_active_user),
-    session: AsyncSession = Depends(get_session),
-) -> QueueEntry:
-    entry = await _get_entry_scoped(session, entry_id, user.restaurant_id)
-    if entry.status != QueueEntryStatus.waiting or entry.called_at is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Entry is not currently called.",
-        )
-    entry.called_at = None
-    await session.commit()
-    await session.refresh(entry)
-    await _broadcast(session, user.restaurant_id, "uncalled", entry)
-    return entry
-
-
 @router.patch("/entries/{entry_id}/walk-away", response_model=QueueEntryRead)
 async def walk_away(
     entry_id: uuid.UUID,

@@ -151,24 +151,6 @@ export default function OpsPage() {
     }
   }
 
-  async function handleCall(id: string, currentlyCalled: boolean) {
-    if (!token) return;
-    setActionId(id);
-    setActionError(null);
-    try {
-      if (currentlyCalled) {
-        await queueApi.uncall(token, id);
-      } else {
-        await queueApi.call(token, id);
-      }
-    } catch (err) {
-      setActionError(toMessage(err, t.ops.errCall));
-      void refresh();
-    } finally {
-      setActionId(null);
-    }
-  }
-
   async function handleWalk(id: string) {
     if (!token) return;
     setActionId(id);
@@ -422,7 +404,6 @@ export default function OpsPage() {
           actionId={actionId}
           onSeat={handleSeat}
           onWalk={handleWalk}
-          onCall={handleCall}
           loading={loading}
         />
         <QueueColumn
@@ -433,7 +414,6 @@ export default function OpsPage() {
           actionId={actionId}
           onSeat={handleSeat}
           onWalk={handleWalk}
-          onCall={handleCall}
           loading={loading}
         />
       </section>
@@ -501,7 +481,6 @@ interface QueueColumnProps {
   actionId: string | null;
   onSeat: (id: string) => void;
   onWalk: (id: string) => void;
-  onCall: (id: string, currentlyCalled: boolean) => void;
   loading: boolean;
 }
 
@@ -513,7 +492,6 @@ function QueueColumn({
   actionId,
   onSeat,
   onWalk,
-  onCall,
   loading,
 }: QueueColumnProps) {
   const { t } = useT();
@@ -543,7 +521,6 @@ function QueueColumn({
               busy={actionId === entry.id}
               onSeat={() => onSeat(entry.id)}
               onWalk={() => onWalk(entry.id)}
-              onCall={() => onCall(entry.id, entry.called_at != null)}
             />
           ))
         )}
@@ -558,26 +535,17 @@ function EntryRow({
   busy,
   onSeat,
   onWalk,
-  onCall,
 }: {
   entry: QueueEntry;
   position: number;
   busy: boolean;
   onSeat: () => void;
   onWalk: () => void;
-  onCall: () => void;
 }) {
   const { t } = useT();
   const waited = waitedMinutes(entry.joined_at);
-  const called = entry.called_at != null;
   return (
-    <li
-      className={
-        called
-          ? "px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4 bg-amber-50"
-          : "px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4"
-      }
-    >
+    <li className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
       <span className="font-mono text-base font-bold text-ifasto-text w-12 shrink-0 tabular-nums">
         {entry.ticket_no != null ? t.ops.ticket(entry.ticket_no) : position}
       </span>
@@ -587,11 +555,6 @@ function EntryRow({
           <span className="text-ifasto-secondary font-normal">
             · {entry.party_size}
           </span>
-          {called && (
-            <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-ifasto-amber text-[11px] font-medium align-middle">
-              {t.ops.calledChip}
-            </span>
-          )}
         </p>
         <p className="text-xs text-ifasto-secondary mt-0.5">
           {t.ops.waited(waited)}
@@ -607,17 +570,6 @@ function EntryRow({
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={onCall}
-          disabled={busy}
-          className={
-            called
-              ? "px-4 py-2.5 text-xs bg-ifasto-amber rounded-md font-medium disabled:opacity-40 transition-opacity"
-              : "px-4 py-2.5 text-xs border border-ifasto-border rounded-md hover:border-ifasto-text disabled:opacity-40 transition-colors"
-          }
-        >
-          {called ? t.ops.uncall : t.ops.call}
-        </button>
         <button
           onClick={onWalk}
           disabled={busy}

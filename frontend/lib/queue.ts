@@ -17,7 +17,6 @@ export interface QueueEntry {
   joined_at: string;
   seated_at: string | null;
   walked_away_at?: string | null;
-  called_at?: string | null;
   status: QueueEntryStatus;
   skip_price: number | null;
   predicted_wait_at_join?: number | null;
@@ -53,10 +52,6 @@ export const queueApi = {
     api<QueueEntry>("/api/queue/entries", { method: "POST", body, token }),
   seat: (token: string, id: string) =>
     api<QueueEntry>(`/api/queue/entries/${id}/seat`, { method: "PATCH", token }),
-  call: (token: string, id: string) =>
-    api<QueueEntry>(`/api/queue/entries/${id}/call`, { method: "PATCH", token }),
-  uncall: (token: string, id: string) =>
-    api<QueueEntry>(`/api/queue/entries/${id}/uncall`, { method: "PATCH", token }),
   walkAway: (token: string, id: string) =>
     api<QueueEntry>(`/api/queue/entries/${id}/walk-away`, { method: "PATCH", token }),
   reinstate: (token: string, id: string) =>
