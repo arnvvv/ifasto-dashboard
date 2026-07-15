@@ -119,10 +119,11 @@ def queue_pressure(regular_waiting: int, premium_waiting: int, seat_count: int) 
 
 async def predict_wait_best_effort(
     venue_config: dict, queue_state: dict
-) -> tuple[float | None, str | None]:
+) -> tuple[float | None, float | None, float | None, str | None]:
     """POST /v2/predict_tokyo with a tight timeout.
 
-    Returns (predicted_wait_mins, request_id). The request_id is echoed into
+    Returns (predicted_wait_mins, p10, p90, request_id). p10/p90 are None
+    when the engine has no quantile heads. The request_id is echoed into
     the engine's prediction JSONL, making the log row exactly joinable to the
     QueueEntry that stores it. Both are None on ANY failure or when the
     engine reports out_of_service_hours — a sentinel value must never be
@@ -141,12 +142,19 @@ async def predict_wait_best_effort(
             resp.raise_for_status()
             data = resp.json()
             if data.get("out_of_service_hours"):
-                return None, None
+                return None, None, None, None
             wait = data.get("predicted_wait_mins")
             if wait is None:
-                return None, None
-            return float(wait), request_id
+                return None, None, None, None
+            p10 = data.get("predicted_wait_p10")
+            p90 = data.get("predicted_wait_p90")
+            return (
+                float(wait),
+                float(p10) if p10 is not None else None,
+                float(p90) if p90 is not None else None,
+                request_id,
+            )
     except Exception as e:
         # repr, not str — httpx.ReadTimeout stringifies to ''.
         logger.warning(f"join-snapshot wait prediction failed (non-fatal): {e!r}")
-        return None, None
+        return None, None, None, None

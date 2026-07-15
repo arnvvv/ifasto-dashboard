@@ -82,6 +82,11 @@ class QueueEntry(Base):
     # occupancy (the dashboard has no table state to know that).
     queue_pressure_at_join: Mapped[float | None] = mapped_column(Float, nullable=True)
     predicted_wait_at_join: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # B-6 band at join (same request as the point estimate). NULL until the
+    # quantile heads exist; guests see "about 15-25 min" instead of a
+    # false-precision point when present.
+    predicted_wait_p10_at_join: Mapped[float | None] = mapped_column(Float, nullable=True)
+    predicted_wait_p90_at_join: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Echoed into the ML server's prediction JSONL — exact join key between
     # this row and the logged feature vector that produced the prediction.
     prediction_request_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

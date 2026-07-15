@@ -66,6 +66,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Sliding session: swap the token for a fresh 7-day one on load and every
+  // 12h. The door tablet stays signed in indefinitely as long as the board
+  // is opened at least once a week. Failures are silent — the old token
+  // keeps working until its own expiry.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const res = await api<{ access_token: string }>("/api/auth/refresh", {
+          method: "POST",
+          token,
+        });
+        if (!cancelled && res.access_token) {
+          localStorage.setItem(TOKEN_KEY, res.access_token);
+          setToken(res.access_token);
+        }
+      } catch {
+        // keep current token; bootstrap 401 handling covers real expiry
+      }
+    };
+    refresh();
+    const id = setInterval(refresh, 12 * 60 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // Deliberately keyed on !!token: re-running on every refreshed token
+    // value would reset the interval (and loop through refresh() each time).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!token]);
+
   const login = useCallback(
     async (email: string, password: string) => {
       // FastAPI-Users JWT login expects OAuth2-form body, not JSON.

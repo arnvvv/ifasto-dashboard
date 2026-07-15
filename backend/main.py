@@ -18,7 +18,7 @@ from app.api import reports as reports_api
 from app.api import settings as settings_api
 from app.api import surveys as surveys_api
 from app.api import websockets as ws_api
-from app.auth.users import auth_backend, current_active_user, fastapi_users
+from app.auth.users import auth_backend, current_active_user, fastapi_users, get_jwt_strategy
 from app.models.user import User
 from app.schemas.user import UserRead, UserUpdate
 
@@ -114,6 +114,17 @@ async def health():
 async def me(user: User = Depends(current_active_user)):
     """Currently-logged-in user. Frontend uses this to check session validity."""
     return user
+
+
+@app.post("/api/auth/refresh")
+async def refresh_token(user: User = Depends(current_active_user)):
+    """Sliding session: a valid token buys a fresh 7-day one. The door tablet
+    calls this on load + every 12h, so it stays signed in as long as the
+    board is opened at least once a week; a stolen token still dies 7 days
+    after its last use."""
+    strategy = get_jwt_strategy()
+    token = await strategy.write_token(user)
+    return {"access_token": token, "token_type": "bearer"}
 
 
 # Login + logout. JWT bearer in Authorization header.

@@ -175,6 +175,8 @@ async def create_entry(
 
     pressure_at_join: float | None = None
     predicted_wait: float | None = None
+    predicted_p10: float | None = None
+    predicted_p90: float | None = None
     prediction_request_id: str | None = None
     if restaurant is not None:
         pressure_at_join = queue_pressure(
@@ -193,8 +195,8 @@ async def create_entry(
         await session.commit()
         # Best-effort L1 prediction (2s timeout, NULL on failure) — engine
         # downtime must never block a join.
-        predicted_wait, prediction_request_id = await predict_wait_best_effort(
-            venue_config, queue_state
+        predicted_wait, predicted_p10, predicted_p90, prediction_request_id = (
+            await predict_wait_best_effort(venue_config, queue_state)
         )
 
     # Daily ticket number: max(today) + 1. Single-worker deployment makes
@@ -220,6 +222,8 @@ async def create_entry(
         queue_ahead_premium=pre_state.premium_waiting,
         queue_pressure_at_join=pressure_at_join,
         predicted_wait_at_join=predicted_wait,
+        predicted_wait_p10_at_join=predicted_p10,
+        predicted_wait_p90_at_join=predicted_p90,
         prediction_request_id=prediction_request_id,
         pricing_session_id=body.pricing_session_id,
         quoted_price=body.quoted_price,

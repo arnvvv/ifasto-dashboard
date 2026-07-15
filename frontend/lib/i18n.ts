@@ -200,6 +200,7 @@ export interface Dict {
     ticketNo: (n: number) => string;
     partiesAhead: (n: number) => string;
     estWait: (m: number) => string;
+    estWaitRange: (lo: number, hi: number) => string;
     waitUnknown: string;
     statusWaiting: string;
     statusSeated: string;
@@ -432,6 +433,7 @@ export const ja: Dict = {
     ticketNo: (n) => `${n}番`,
     partiesAhead: (n) => `あと ${n} 組`,
     estWait: (m) => `目安 約${m}分`,
+    estWaitRange: (lo, hi) => `目安 約${lo}〜${hi}分`,
     waitUnknown: "待ち時間は店頭でご確認ください",
     statusWaiting: "お呼び出しまでお待ちください",
     statusSeated: "ご案内済みです",
@@ -663,6 +665,7 @@ export const en: Dict = {
     ticketNo: (n) => `No. ${n}`,
     partiesAhead: (n) => `${n} ${n === 1 ? "party" : "parties"} ahead`,
     estWait: (m) => `About ${m} min`,
+    estWaitRange: (lo, hi) => `About ${lo}-${hi} min`,
     waitUnknown: "Ask the staff for the current wait",
     statusWaiting: "Please wait to be called",
     statusSeated: "You have been seated",

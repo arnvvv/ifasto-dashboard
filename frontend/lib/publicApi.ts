@@ -17,6 +17,8 @@ export interface PublicEntry {
   party_size: number;
   parties_ahead: number;
   est_remaining_mins: number | null;
+  est_remaining_p10: number | null;
+  est_remaining_p90: number | null;
   venue_name: string;
   venue_name_ja: string | null;
   entry_type: "regular" | "premium";

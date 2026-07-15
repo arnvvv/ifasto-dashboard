@@ -124,9 +124,14 @@ export default function GuestTicketPage() {
                   {t.guest.partiesAhead(entry.parties_ahead)}
                 </p>
                 <p className="text-ifasto-secondary mt-1">
-                  {entry.est_remaining_mins !== null
-                    ? t.guest.estWait(Math.round(entry.est_remaining_mins))
-                    : t.guest.waitUnknown}
+                  {entry.est_remaining_p10 !== null && entry.est_remaining_p90 !== null
+                    ? t.guest.estWaitRange(
+                        Math.round(entry.est_remaining_p10),
+                        Math.round(entry.est_remaining_p90)
+                      )
+                    : entry.est_remaining_mins !== null
+                      ? t.guest.estWait(Math.round(entry.est_remaining_mins))
+                      : t.guest.waitUnknown}
                 </p>
               </>
             )}

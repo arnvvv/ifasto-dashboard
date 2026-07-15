@@ -66,11 +66,18 @@ class PublicJoin(BaseModel):
 
 def _entry_public_view(entry: QueueEntry, parties_ahead: int, venue: Restaurant) -> dict:
     # Honest remaining estimate: join-time prediction minus elapsed, floored.
+    # The p10/p90 band counts down the same way (it is a band on the same
+    # wall-clock event, so elapsed time shifts all three identically).
     remaining = None
+    remaining_p10 = None
+    remaining_p90 = None
     if entry.predicted_wait_at_join is not None and entry.status == QueueEntryStatus.waiting:
         joined = entry.joined_at if entry.joined_at.tzinfo else entry.joined_at.replace(tzinfo=timezone.utc)
         elapsed = (datetime.now(timezone.utc) - joined).total_seconds() / 60.0
         remaining = max(0.0, round(entry.predicted_wait_at_join - elapsed, 1))
+        if entry.predicted_wait_p10_at_join is not None and entry.predicted_wait_p90_at_join is not None:
+            remaining_p10 = max(0.0, round(entry.predicted_wait_p10_at_join - elapsed, 1))
+            remaining_p90 = max(0.0, round(entry.predicted_wait_p90_at_join - elapsed, 1))
     return {
         "entry_id": str(entry.id),
         "ticket_no": entry.ticket_no,
@@ -78,6 +85,8 @@ def _entry_public_view(entry: QueueEntry, parties_ahead: int, venue: Restaurant)
         "party_size": entry.party_size,
         "parties_ahead": parties_ahead,
         "est_remaining_mins": remaining,
+        "est_remaining_p10": remaining_p10,
+        "est_remaining_p90": remaining_p90,
         "venue_name": venue.name,
         "venue_name_ja": venue.name_ja,
         # Receipt fields: staff-sold fast passes surface as purchase proof on
