@@ -84,6 +84,7 @@ def _entry_public_view(entry: QueueEntry, parties_ahead: int, venue: Restaurant)
         "status": entry.status.value,
         "party_size": entry.party_size,
         "parties_ahead": parties_ahead,
+        "called": entry.called_at is not None and entry.status == QueueEntryStatus.waiting,
         "est_remaining_mins": remaining,
         "est_remaining_p10": remaining_p10,
         "est_remaining_p90": remaining_p90,

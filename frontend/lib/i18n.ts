@@ -94,6 +94,10 @@ export interface Dict {
     waited: (mins: number) => string;
     seat: string;
     walk: string;
+    call: string;
+    uncall: string;
+    calledChip: string;
+    errCall: string;
 
     errSeat: string;
     errWalk: string;
@@ -202,6 +206,8 @@ export interface Dict {
     estWait: (m: number) => string;
     estWaitRange: (lo: number, hi: number) => string;
     waitUnknown: string;
+    calledTitle: string;
+    calledBody: string;
     statusWaiting: string;
     statusSeated: string;
     statusSeatedBody: string;
@@ -326,6 +332,10 @@ export const ja: Dict = {
     waited: (m) => `待ち ${m}分`,
     seat: "案内",
     walk: "不在",
+    call: "呼出",
+    uncall: "呼出取消",
+    calledChip: "呼出中",
+    errCall: "呼び出しに失敗しました。",
 
     errSeat: "案内の処理に失敗しました。",
     errWalk: "不在の処理に失敗しました。",
@@ -435,6 +445,8 @@ export const ja: Dict = {
     estWait: (m) => `目安 約${m}分`,
     estWaitRange: (lo, hi) => `目安 約${lo}〜${hi}分`,
     waitUnknown: "待ち時間は店頭でご確認ください",
+    calledTitle: "お呼び出し中です",
+    calledBody: "入口までお越しください。",
     statusWaiting: "お呼び出しまでお待ちください",
     statusSeated: "ご案内済みです",
     statusSeatedBody: "スタッフの案内に従ってお進みください。",
@@ -558,6 +570,10 @@ export const en: Dict = {
     waited: (m) => `waited ${m} min`,
     seat: "Seat",
     walk: "Walk",
+    call: "Call",
+    uncall: "Cancel call",
+    calledChip: "Calling",
+    errCall: "Could not call the party.",
 
     errSeat: "Could not seat that party.",
     errWalk: "Could not mark that party as walked away.",
@@ -667,6 +683,8 @@ export const en: Dict = {
     estWait: (m) => `About ${m} min`,
     estWaitRange: (lo, hi) => `About ${lo}-${hi} min`,
     waitUnknown: "Ask the staff for the current wait",
+    calledTitle: "It's your turn",
+    calledBody: "Please come to the entrance.",
     statusWaiting: "Please wait to be called",
     statusSeated: "You have been seated",
     statusSeatedBody: "Please follow the staff's directions.",

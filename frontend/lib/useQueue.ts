@@ -93,6 +93,12 @@ export function useQueue(token: string | null): UseQueueResult {
               if (evt.event === "joined" || evt.event === "reinstated") {
                 return idx >= 0 ? prev : [...prev, entry];
               }
+              // called / uncalled — still waiting, update in place.
+              if (evt.event === "called" || evt.event === "uncalled") {
+                return idx >= 0
+                  ? prev.map((e) => (e.id === entry.id ? entry : e))
+                  : prev;
+              }
               // seated / walked_away — entry leaves the waiting list.
               return idx >= 0 ? prev.filter((e) => e.id !== entry.id) : prev;
             });

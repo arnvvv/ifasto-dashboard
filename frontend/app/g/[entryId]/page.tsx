@@ -15,6 +15,7 @@ import {
 import { useGuestLocale } from "@/lib/useGuestLocale";
 
 const POLL_MS = 10_000;
+const CALLED_POLL_MS = 4_000;
 
 export default function GuestTicketPage() {
   const { entryId } = useParams<{ entryId: string }>();
@@ -29,7 +30,17 @@ export default function GuestTicketPage() {
   const refresh = useCallback(() => {
     getEntry(entryId)
       .then((e) => {
-        setEntry(e);
+        setEntry((prev) => {
+          // One vibration burst on the waiting -> called transition.
+          if (e.called && !(prev && prev.called) && "vibrate" in navigator) {
+            try {
+              navigator.vibrate([300, 100, 300, 100, 300]);
+            } catch {
+              // unsupported — the visual takeover is the primary signal
+            }
+          }
+          return e;
+        });
         // Terminal states: stop polling, forget the stored ticket.
         if (e.status !== "waiting") {
           if (timer.current) clearInterval(timer.current);
@@ -45,9 +56,11 @@ export default function GuestTicketPage() {
       });
   }, [entryId]);
 
+  const isCalled = entry?.called === true && entry.status === "waiting";
+
   useEffect(() => {
     refresh();
-    timer.current = setInterval(refresh, POLL_MS);
+    timer.current = setInterval(refresh, isCalled ? CALLED_POLL_MS : POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") refresh();
     };
@@ -56,7 +69,7 @@ export default function GuestTicketPage() {
       if (timer.current) clearInterval(timer.current);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refresh]);
+  }, [refresh, isCalled]);
 
   async function handleLeave() {
     if (leaving) return;
@@ -118,7 +131,15 @@ export default function GuestTicketPage() {
             <p className="font-mono text-6xl text-ifasto-text mb-2">
               {t.guest.ticketNo(entry.ticket_no)}
             </p>
-            {entry.status === "waiting" && (
+            {entry.status === "waiting" && entry.called && (
+              <div className="mt-4 rounded-md bg-ifasto-amber px-4 py-5 animate-pulse">
+                <p className="text-2xl font-bold text-ifasto-text">
+                  {t.guest.calledTitle}
+                </p>
+                <p className="text-base text-ifasto-text mt-1">{t.guest.calledBody}</p>
+              </div>
+            )}
+            {entry.status === "waiting" && !entry.called && (
               <>
                 <p className="text-lg text-ifasto-text mt-4">
                   {t.guest.partiesAhead(entry.parties_ahead)}
@@ -140,7 +161,7 @@ export default function GuestTicketPage() {
           {entry.status === "waiting" && (
             <>
               <p className="text-base text-ifasto-text text-center mb-2">
-                {t.guest.statusWaiting}
+                {entry.called ? t.guest.calledBody : t.guest.statusWaiting}
               </p>
               <p className="text-sm text-ifasto-secondary text-center mb-8">{t.guest.keepOpen}</p>
 
