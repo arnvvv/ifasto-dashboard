@@ -190,101 +190,6 @@ async def set_superuser(email: str, enabled: bool) -> None:
         await session.commit()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(prog="cli.py", description="ifasto admin CLI")
-    sub = parser.add_subparsers(dest="cmd", required=True)
-
-    co = sub.add_parser("create-owner", help="Mint an owner account + venue")
-    co.add_argument("--email", required=True)
-    co.add_argument("--name", required=True)
-    co.add_argument("--restaurant-name", required=True)
-    co.add_argument("--restaurant-name-ja", default=None, help="Japanese name (optional)")
-    co.add_argument(
-        "--venue-type",
-        default="other",
-        choices=[t.value for t in VenueType],
-    )
-    co.add_argument("--avg-check", type=int, required=True, help="Average per-person check, in yen")
-
-    ex = sub.add_parser(
-        "export-training-data",
-        help="Dump completed queue entries as JSONL training rows",
-    )
-    ex.add_argument("--out", default=None, help="Output path (default: stdout)")
-    ex.add_argument(
-        "--include-test",
-        action="store_true",
-        help="Keep rows whose party_name contains 'test' (excluded by default)",
-    )
-
-    hz = sub.add_parser(
-        "export-hazard-data",
-        help="Person-period (5-min) rows with competing-risks events for willingness-to-wait modeling",
-    )
-    hz.add_argument("--out", default=None, help="Output path (default: stdout)")
-    hz.add_argument("--include-test", action="store_true")
-
-    rq = sub.add_parser(
-        "rotate-qr",
-        help="Mint or rotate a venue's guest QR token (invalidates the old QR)",
-    )
-    rq.add_argument("--restaurant-name", required=True)
-
-    su = sub.add_parser("set-superuser", help="Grant/revoke founder admin (cross-venue overview)")
-    su.add_argument("--email", required=True)
-    su.add_argument("--revoke", action="store_true")
-
-    args = parser.parse_args()
-
-    if args.cmd == "set-superuser":
-        asyncio.run(set_superuser(args.email, not args.revoke))
-        print(f"{args.email}: is_superuser={'False' if args.revoke else 'True'}")
-        return
-
-    if args.cmd == "rotate-qr":
-        token = asyncio.run(rotate_qr(args.restaurant_name))
-        print(f"qr_token: {token}")
-        print(f"guest URL: https://app.ifasto.com/q/{token}")
-        return
-
-    if args.cmd == "export-hazard-data":
-        n = asyncio.run(export_hazard_data(args.out, args.include_test))
-        print(f"exported {n} person-period rows" + (f" -> {args.out}" if args.out else ""), file=sys.stderr)
-        return
-
-    if args.cmd == "export-training-data":
-        n = asyncio.run(export_training_data(args.out, args.include_test))
-        print(f"exported {n} rows" + (f" -> {args.out}" if args.out else ""), file=sys.stderr)
-        return
-
-    if args.cmd == "create-owner":
-        pw = asyncio.run(
-            create_owner(
-                email=args.email,
-                name=args.name,
-                restaurant_name=args.restaurant_name,
-                restaurant_name_ja=args.restaurant_name_ja,
-                venue_type=args.venue_type,
-                avg_check=args.avg_check,
-            )
-        )
-        print()
-        print("=" * 60)
-        print("  Owner account minted")
-        print("=" * 60)
-        print(f"  email:      {args.email}")
-        print(f"  password:   {pw}")
-        print(f"  restaurant: {args.restaurant_name}")
-        print("  role:       owner")
-        print("=" * 60)
-        print("\n  Send the password to the operator via a secure channel.")
-        print("  Have them change it after first login.\n")
-
-
-if __name__ == "__main__":
-    main()
-
-
 # --- Discrete-time hazard export (willingness-to-wait modeling) -------------
 #
 # One row per party per 5-minute interval survived in the queue. Event coding
@@ -441,3 +346,98 @@ async def export_hazard_data(out_path: str | None, include_test: bool) -> int:
         if out_path:
             out.close()
     return len(rows_out)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="cli.py", description="ifasto admin CLI")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    co = sub.add_parser("create-owner", help="Mint an owner account + venue")
+    co.add_argument("--email", required=True)
+    co.add_argument("--name", required=True)
+    co.add_argument("--restaurant-name", required=True)
+    co.add_argument("--restaurant-name-ja", default=None, help="Japanese name (optional)")
+    co.add_argument(
+        "--venue-type",
+        default="other",
+        choices=[t.value for t in VenueType],
+    )
+    co.add_argument("--avg-check", type=int, required=True, help="Average per-person check, in yen")
+
+    ex = sub.add_parser(
+        "export-training-data",
+        help="Dump completed queue entries as JSONL training rows",
+    )
+    ex.add_argument("--out", default=None, help="Output path (default: stdout)")
+    ex.add_argument(
+        "--include-test",
+        action="store_true",
+        help="Keep rows whose party_name contains 'test' (excluded by default)",
+    )
+
+    hz = sub.add_parser(
+        "export-hazard-data",
+        help="Person-period (5-min) rows with competing-risks events for willingness-to-wait modeling",
+    )
+    hz.add_argument("--out", default=None, help="Output path (default: stdout)")
+    hz.add_argument("--include-test", action="store_true")
+
+    rq = sub.add_parser(
+        "rotate-qr",
+        help="Mint or rotate a venue's guest QR token (invalidates the old QR)",
+    )
+    rq.add_argument("--restaurant-name", required=True)
+
+    su = sub.add_parser("set-superuser", help="Grant/revoke founder admin (cross-venue overview)")
+    su.add_argument("--email", required=True)
+    su.add_argument("--revoke", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.cmd == "set-superuser":
+        asyncio.run(set_superuser(args.email, not args.revoke))
+        print(f"{args.email}: is_superuser={'False' if args.revoke else 'True'}")
+        return
+
+    if args.cmd == "rotate-qr":
+        token = asyncio.run(rotate_qr(args.restaurant_name))
+        print(f"qr_token: {token}")
+        print(f"guest URL: https://app.ifasto.com/q/{token}")
+        return
+
+    if args.cmd == "export-hazard-data":
+        n = asyncio.run(export_hazard_data(args.out, args.include_test))
+        print(f"exported {n} person-period rows" + (f" -> {args.out}" if args.out else ""), file=sys.stderr)
+        return
+
+    if args.cmd == "export-training-data":
+        n = asyncio.run(export_training_data(args.out, args.include_test))
+        print(f"exported {n} rows" + (f" -> {args.out}" if args.out else ""), file=sys.stderr)
+        return
+
+    if args.cmd == "create-owner":
+        pw = asyncio.run(
+            create_owner(
+                email=args.email,
+                name=args.name,
+                restaurant_name=args.restaurant_name,
+                restaurant_name_ja=args.restaurant_name_ja,
+                venue_type=args.venue_type,
+                avg_check=args.avg_check,
+            )
+        )
+        print()
+        print("=" * 60)
+        print("  Owner account minted")
+        print("=" * 60)
+        print(f"  email:      {args.email}")
+        print(f"  password:   {pw}")
+        print(f"  restaurant: {args.restaurant_name}")
+        print("  role:       owner")
+        print("=" * 60)
+        print("\n  Send the password to the operator via a secure channel.")
+        print("  Have them change it after first login.\n")
+
+
+if __name__ == "__main__":
+    main()
