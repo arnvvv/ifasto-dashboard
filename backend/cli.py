@@ -17,6 +17,7 @@ have them change it after first login.
 """
 
 import argparse
+import os
 import asyncio
 import json
 import secrets
@@ -216,6 +217,13 @@ def main() -> None:
         help="Keep rows whose party_name contains 'test' (excluded by default)",
     )
 
+    hz = sub.add_parser(
+        "export-hazard-data",
+        help="Person-period (5-min) rows with competing-risks events for willingness-to-wait modeling",
+    )
+    hz.add_argument("--out", default=None, help="Output path (default: stdout)")
+    hz.add_argument("--include-test", action="store_true")
+
     rq = sub.add_parser(
         "rotate-qr",
         help="Mint or rotate a venue's guest QR token (invalidates the old QR)",
@@ -237,6 +245,11 @@ def main() -> None:
         token = asyncio.run(rotate_qr(args.restaurant_name))
         print(f"qr_token: {token}")
         print(f"guest URL: https://app.ifasto.com/q/{token}")
+        return
+
+    if args.cmd == "export-hazard-data":
+        n = asyncio.run(export_hazard_data(args.out, args.include_test))
+        print(f"exported {n} person-period rows" + (f" -> {args.out}" if args.out else ""), file=sys.stderr)
         return
 
     if args.cmd == "export-training-data":
@@ -270,3 +283,161 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# --- Discrete-time hazard export (willingness-to-wait modeling) -------------
+#
+# One row per party per 5-minute interval survived in the queue. Event coding
+# follows a COMPETING-RISKS design, not plain right censoring: being seated
+# is an outcome that PREVENTS abandonment (fast service and low abandonment
+# share causes), so each interval is labeled with what ended it, and
+# cause-specific models censor the other cause explicitly downstream.
+#   event = "abandoned" | "seated" | "none" (survived the interval)
+#
+# Queue state is TIME-VARYING: each interval carries the queue as it was at
+# that interval's start, reconstructed by replaying join/seat/walk timestamps,
+# plus progress features (parties served since this party joined, position
+# now vs position at join). Perceived progress, not just the joining
+# condition, is the hypothesized driver.
+#
+# prior_hazard is a literature-shaped Weibull hazard evaluated at elapsed
+# time normalized by the venue's median wait — the patience-curve prior.
+# Shape/scale are placeholders calibrated to published call-center patience
+# analyses; refit from the Technion microdata once registered access is set
+# up, via the two env vars below.
+
+HAZARD_INTERVAL_MIN = 5.0
+# Weibull hazard h(u) = (k/lam) * (u/lam)^(k-1), u = elapsed / median_wait.
+# k > 1: giving up accelerates as the wait stretches past expectations.
+PATIENCE_WEIBULL_K = float(os.environ.get("PATIENCE_WEIBULL_K", "1.6"))
+PATIENCE_WEIBULL_LAM = float(os.environ.get("PATIENCE_WEIBULL_LAM", "1.8"))
+
+
+def _prior_hazard(elapsed_mins: float, median_wait_mins: float) -> float:
+    if median_wait_mins <= 0:
+        return 0.0
+    u = max(elapsed_mins, 0.01) / median_wait_mins
+    k, lam = PATIENCE_WEIBULL_K, PATIENCE_WEIBULL_LAM
+    return round((k / lam) * (u / lam) ** (k - 1), 4)
+
+
+async def export_hazard_data(out_path: str | None, include_test: bool) -> int:
+    def _aware(dt):
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    rows_out: list[dict] = []
+    async with SessionLocal() as session:
+        restaurants = {
+            r.id: r for r in (await session.execute(select(Restaurant))).scalars()
+        }
+        all_entries = list((await session.execute(
+            select(QueueEntry).order_by(QueueEntry.joined_at.asc())
+        )).scalars())
+
+        # Timeline per restaurant for queue-state replay.
+        by_rest: dict = {}
+        for e in all_entries:
+            by_rest.setdefault(e.restaurant_id, []).append(e)
+
+        def queue_state_at(rest_entries, t):
+            """Waiting-party count at instant t, replayed from timestamps."""
+            waiting = 0
+            for e in rest_entries:
+                joined = _aware(e.joined_at)
+                if joined > t:
+                    break  # sorted by join time
+                ended = None
+                if e.seated_at is not None:
+                    ended = _aware(e.seated_at)
+                elif e.walked_away_at is not None:
+                    ended = _aware(e.walked_away_at)
+                if ended is None or ended > t:
+                    waiting += 1
+            return waiting
+
+        def seated_between(rest_entries, t0, t1):
+            n = 0
+            for e in rest_entries:
+                if e.seated_at is not None and t0 < _aware(e.seated_at) <= t1:
+                    n += 1
+            return n
+
+        # Venue median realized wait (fallback 30 min pre-data) for the prior.
+        med_by_rest: dict = {}
+        for rid, res in by_rest.items():
+            waits = []
+            for e in res:
+                if e.seated_at is not None:
+                    waits.append((_aware(e.seated_at) - _aware(e.joined_at)).total_seconds() / 60)
+            waits.sort()
+            med_by_rest[rid] = waits[len(waits) // 2] if waits else 30.0
+
+        from datetime import timedelta
+
+        for e in all_entries:
+            if not include_test and e.party_name and "test" in e.party_name.lower():
+                continue
+            if e.status == QueueEntryStatus.waiting:
+                continue  # still in queue: no outcome yet, skip entirely
+            joined = _aware(e.joined_at)
+            if e.status == QueueEntryStatus.seated and e.seated_at is not None:
+                ended, terminal = _aware(e.seated_at), "seated"
+            elif e.status == QueueEntryStatus.walked_away and e.walked_away_at is not None:
+                ended, terminal = _aware(e.walked_away_at), "abandoned"
+            else:
+                continue
+            total_mins = (ended - joined).total_seconds() / 60
+            if total_mins < 0 or total_mins > 600:
+                continue  # clock skew or forgotten row; not a patience signal
+
+            rest_entries = by_rest[e.restaurant_id]
+            r = restaurants.get(e.restaurant_id)
+            median_wait = med_by_rest[e.restaurant_id]
+            n_intervals = max(1, int(total_mins // HAZARD_INTERVAL_MIN) + 1)
+
+            for i in range(n_intervals):
+                t0 = joined + timedelta(minutes=i * HAZARD_INTERVAL_MIN)
+                t1 = min(joined + timedelta(minutes=(i + 1) * HAZARD_INTERVAL_MIN), ended)
+                last = i == n_intervals - 1
+                elapsed = i * HAZARD_INTERVAL_MIN
+                t0_jst = t0.astimezone(JST)
+                rows_out.append({
+                    "entry_id": str(e.id),
+                    "restaurant_id": str(e.restaurant_id),
+                    "interval_index": i,
+                    "elapsed_mins": elapsed,
+                    # competing-risks event coding for this interval
+                    "event": terminal if last else "none",
+                    # party (join-time, fixed)
+                    "party_size": e.party_size,
+                    "entry_type": e.entry_type.value,
+                    "queue_ahead_at_join": (e.queue_ahead_regular or 0) + (e.queue_ahead_premium or 0),
+                    "predicted_wait_at_join": e.predicted_wait_at_join,
+                    # TIME-VARYING queue state at interval start
+                    "waiting_now": queue_state_at(rest_entries, t0),
+                    "seated_prev_interval": seated_between(
+                        rest_entries, t0 - timedelta(minutes=HAZARD_INTERVAL_MIN), t0
+                    ),
+                    # progress features (perceived movement)
+                    "served_since_join": seated_between(rest_entries, joined, t0),
+                    "elapsed_vs_predicted": (
+                        round(elapsed / e.predicted_wait_at_join, 3)
+                        if e.predicted_wait_at_join else None
+                    ),
+                    # patience-curve prior
+                    "prior_hazard": _prior_hazard(elapsed, median_wait),
+                    "venue_median_wait": round(median_wait, 1),
+                    # context
+                    "hour_jst": t0_jst.hour,
+                    "dow_jst": t0_jst.weekday(),
+                    "restaurant_seat_count": r.seat_count if r else None,
+                })
+
+    out = open(out_path, "w") if out_path else sys.stdout
+    try:
+        for row in rows_out:
+            out.write(json.dumps(row) + "\n")
+    finally:
+        if out_path:
+            out.close()
+    return len(rows_out)

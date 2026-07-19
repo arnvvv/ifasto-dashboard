@@ -1,14 +1,25 @@
 "use client";
 
-// WTP field survey — built for one-handed phone entry while standing in a
-// real Tokyo queue. Venue + wait persist between entries so consecutive
-// interviews at the same line are a few taps each.
+// WTP field survey v2 — the 5-question intercept protocol, built for
+// one-handed phone entry while standing in a real Tokyo queue.
+//
+// Core mechanic: ONE randomized skip price per respondent, yes/no. Never
+// ask "how much would you pay" (anchoring) and never show one person two
+// prices. Aggregated acceptance by price point traces the demand curve.
+// Venue + current wait persist between entries so consecutive interviews
+// at the same line are a few taps each.
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { surveysApi } from "@/lib/surveys";
+
+const PRICES = [500, 1000, 1500, 2000, 3000];
+
+function drawPrice(): number {
+  return PRICES[Math.floor(Math.random() * PRICES.length)];
+}
 
 export default function SurveyPage() {
   const router = useRouter();
@@ -18,10 +29,14 @@ export default function SurveyPage() {
   const [venue, setVenue] = useState("");
   const [waitMins, setWaitMins] = useState("");
   // Per-respondent:
+  const [offeredPrice, setOfferedPrice] = useState<number>(drawPrice);
   const [partySize, setPartySize] = useState(2);
   const [respondent, setRespondent] = useState<"tourist" | "local">("tourist");
+  const [perceivedWait, setPerceivedWait] = useState("");
+  const [maxWait, setMaxWait] = useState("");
   const [wouldSkip, setWouldSkip] = useState<boolean | null>(null);
-  const [maxFee, setMaxFee] = useState("");
+  const [pressure, setPressure] = useState<"hurry" | "normal" | "relaxed" | "">("");
+  const [firstVisit, setFirstVisit] = useState<boolean | null>(null);
   const [reason, setReason] = useState("");
 
   const [savedToday, setSavedToday] = useState(0);
@@ -54,15 +69,24 @@ export default function SurveyPage() {
         party_size: partySize,
         respondent,
         would_skip: wouldSkip,
-        max_fee_yen: wouldSkip && maxFee.trim() ? Number(maxFee) : null,
+        offered_price_yen: offeredPrice,
+        perceived_wait_mins: perceivedWait.trim() ? Number(perceivedWait) : null,
+        stated_max_wait_mins: maxWait.trim() ? Number(maxWait) : null,
+        time_pressure: pressure || null,
+        first_visit: firstVisit,
         reason: reason.trim() || null,
       });
       setSavedToday((n) => n + 1);
-      // Reset per-respondent fields; keep venue + wait for the next interview.
+      // Reset per-respondent fields and DRAW A FRESH PRICE for the next
+      // interview; keep venue + wait sticky.
+      setOfferedPrice(drawPrice());
       setPartySize(2);
       setRespondent("tourist");
+      setPerceivedWait("");
+      setMaxWait("");
       setWouldSkip(null);
-      setMaxFee("");
+      setPressure("");
+      setFirstVisit(null);
       setReason("");
       setFlash(true);
       setTimeout(() => setFlash(false), 900);
@@ -86,7 +110,7 @@ export default function SurveyPage() {
       <header className="flex items-center justify-between">
         <div>
           <p className="font-display text-2xl tracking-tight leading-none">
-            WTP survey
+            WTP survey v2
           </p>
           <p className="text-xs text-ifasto-secondary mt-1">
             {savedToday} saved today
@@ -113,7 +137,7 @@ export default function SurveyPage() {
       <div className="grid grid-cols-2 gap-4">
         <label className="block space-y-1.5">
           <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary">
-            Current wait (min)
+            Actual wait (min, sticky)
           </span>
           <input
             type="number" inputMode="numeric" min={0} max={600}
@@ -151,30 +175,96 @@ export default function SurveyPage() {
         onChange={(v) => setRespondent(v as "tourist" | "local")}
       />
 
-      <Toggle
-        label="Would they pay to skip?"
-        options={[["yes", "Yes"], ["no", "No"]]}
-        value={wouldSkip === null ? "" : wouldSkip ? "yes" : "no"}
-        onChange={(v) => setWouldSkip(v === "yes")}
-      />
+      {/* Q1 */}
+      <label className="block space-y-1.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary">
+          Q1 · 何分待ちだと思いますか？ (perceived wait, min)
+        </span>
+        <input
+          type="number" inputMode="numeric" min={0} max={600}
+          value={perceivedWait}
+          onChange={(e) => setPerceivedWait(e.target.value)}
+          className="w-full px-4 py-3 bg-white border border-ifasto-border rounded-lg text-base focus:outline-none focus:border-ifasto-text"
+        />
+      </label>
 
-      {wouldSkip && (
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary">
-            Max fee (¥)
-          </span>
-          <input
-            type="number" inputMode="numeric" min={0} step={100}
-            value={maxFee}
-            onChange={(e) => setMaxFee(e.target.value)}
-            className="w-full px-4 py-3 bg-white border border-ifasto-border rounded-lg text-base focus:outline-none focus:border-ifasto-text"
-          />
-        </label>
-      )}
+      {/* Q2 */}
+      <label className="block space-y-1.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary">
+          Q2 · 最大で何分まで待てますか？ (max wait, min)
+        </span>
+        <input
+          type="number" inputMode="numeric" min={0} max={600}
+          value={maxWait}
+          onChange={(e) => setMaxWait(e.target.value)}
+          className="w-full px-4 py-3 bg-white border border-ifasto-border rounded-lg text-base focus:outline-none focus:border-ifasto-text"
+        />
+      </label>
+
+      {/* Q3 — the randomized price. Assigned, never chosen. */}
+      <div className="border-2 border-ifasto-text rounded-xl p-4 bg-white space-y-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary block">
+          Q3 · Ask exactly this
+        </span>
+        <p className="text-base leading-relaxed">
+          もし<strong className="text-xl">¥{offeredPrice.toLocaleString()}</strong>で待たずに入れるとしたら、利用しますか？
+        </p>
+        <p className="text-xs text-ifasto-secondary">
+          (If you could skip the wait for ¥{offeredPrice.toLocaleString()}, would you?)
+          · price is randomly assigned, do not reroll for the same person
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {[["yes", "Yes"], ["no", "No"]].map(([v, text]) => (
+            <button
+              key={v}
+              onClick={() => setWouldSkip(v === "yes")}
+              className={`py-3.5 rounded-lg text-base font-medium border transition-colors ${
+                (wouldSkip === null ? "" : wouldSkip ? "yes" : "no") === v
+                  ? "bg-ifasto-text text-ifasto-bg border-ifasto-text"
+                  : "bg-white text-ifasto-secondary border-ifasto-border"
+              }`}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Q4 */}
+      <div className="space-y-1.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary block">
+          Q4 · お時間に余裕がありますか？ (time pressure)
+        </span>
+        <div className="grid grid-cols-3 gap-2">
+          {([["hurry", "Hurry"], ["normal", "Normal"], ["relaxed", "Relaxed"]] as const).map(
+            ([v, text]) => (
+              <button
+                key={v}
+                onClick={() => setPressure(v)}
+                className={`py-3 rounded-lg text-sm font-medium border transition-colors ${
+                  pressure === v
+                    ? "bg-ifasto-text text-ifasto-bg border-ifasto-text"
+                    : "bg-white text-ifasto-secondary border-ifasto-border"
+                }`}
+              >
+                {text}
+              </button>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* Q5 */}
+      <Toggle
+        label="Q5 · このお店は初めてですか？ (first visit)"
+        options={[["yes", "First visit"], ["no", "Repeat"]]}
+        value={firstVisit === null ? "" : firstVisit ? "yes" : "no"}
+        onChange={(v) => setFirstVisit(v === "yes")}
+      />
 
       <label className="block space-y-1.5">
         <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary">
-          Reason (one word)
+          Reason (one word, optional)
         </span>
         <input
           type="text"

@@ -158,7 +158,16 @@ class WtpSurvey(Base):
     party_size: Mapped[int] = mapped_column(Integer, nullable=False)
     respondent: Mapped[str] = mapped_column(String(10), nullable=False)  # tourist | local
     would_skip: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    # LEGACY open-ended "how much would you pay" — kept for old rows, no
+    # longer collected (anchoring bias). v2 uses one randomized offered
+    # price per respondent and a yes/no, which traces the demand curve.
     max_fee_yen: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # --- v2 intercept fields (2026-07, pre-pilot field protocol) ---
+    offered_price_yen: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    perceived_wait_mins: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stated_max_wait_mins: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    time_pressure: Mapped[str | None] = mapped_column(String(10), nullable=True)  # hurry|normal|relaxed
+    first_visit: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

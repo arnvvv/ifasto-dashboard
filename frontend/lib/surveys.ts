@@ -8,7 +8,12 @@ export interface SurveyCreate {
   party_size: number;
   respondent: "tourist" | "local";
   would_skip: boolean;
-  max_fee_yen?: number | null;
+  max_fee_yen?: number | null; // legacy, no longer collected
+  offered_price_yen?: number | null;
+  perceived_wait_mins?: number | null;
+  stated_max_wait_mins?: number | null;
+  time_pressure?: "hurry" | "normal" | "relaxed" | null;
+  first_visit?: boolean | null;
   reason?: string | null;
   notes?: string | null;
 }
