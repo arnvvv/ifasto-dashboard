@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { surveysApi } from "@/lib/surveys";
+import { surveysApi, type SurveySummary } from "@/lib/surveys";
 
 const PRICES = [500, 1000, 1500, 2000, 3000];
 
@@ -43,6 +43,13 @@ export default function SurveyPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
+  const [showCurve, setShowCurve] = useState(false);
+  const [summary, setSummary] = useState<SurveySummary | null>(null);
+
+  function loadSummary() {
+    if (!token) return;
+    surveysApi.summary(token).then(setSummary).catch(() => {});
+  }
 
   useEffect(() => {
     if (!authLoading && !token) router.replace("/login");
@@ -90,6 +97,7 @@ export default function SurveyPage() {
       setReason("");
       setFlash(true);
       setTimeout(() => setFlash(false), 900);
+      if (showCurve) loadSummary();
     } catch {
       setErr("Could not save. Check connection and retry.");
     } finally {
@@ -120,6 +128,67 @@ export default function SurveyPage() {
           ← Ops
         </Link>
       </header>
+
+      <button
+        onClick={() => {
+          const next = !showCurve;
+          setShowCurve(next);
+          if (next) loadSummary();
+        }}
+        className="text-sm text-ifasto-text underline underline-offset-4 self-start"
+      >
+        {showCurve ? "Hide demand curve" : "Show demand curve"}
+      </button>
+
+      {showCurve && summary && (
+        <div className="border border-ifasto-border rounded-xl bg-white p-4 space-y-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-semibold">Demand curve</span>
+            <span className="text-xs text-ifasto-secondary">
+              {summary.total} responses
+              {summary.overall_yes_rate !== null &&
+                ` · ${Math.round(summary.overall_yes_rate * 100)}% yes overall`}
+            </span>
+          </div>
+
+          {summary.by_price.length === 0 ? (
+            <p className="text-xs text-ifasto-secondary">No v2 responses yet.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {summary.by_price.map((p) => {
+                const pct = p.yes_rate === null ? 0 : Math.round(p.yes_rate * 100);
+                return (
+                  <div key={p.price} className="flex items-center gap-2 text-xs">
+                    <span className="w-14 tabular-nums text-right text-ifasto-secondary">
+                      ¥{p.price.toLocaleString()}
+                    </span>
+                    <div className="flex-1 h-5 bg-ifasto-bg rounded overflow-hidden">
+                      <div
+                        className="h-full bg-ifasto-text flex items-center justify-end pr-1.5"
+                        style={{ width: `${Math.max(pct, 6)}%` }}
+                      >
+                        <span className="text-[10px] text-ifasto-bg font-medium">{pct}%</span>
+                      </div>
+                    </div>
+                    <span className="w-12 tabular-nums text-ifasto-secondary">n={p.n}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ifasto-secondary pt-1 border-t border-ifasto-border">
+            {Object.entries(summary.by_respondent).map(([k, v]) => (
+              <span key={k}>
+                {k}: {v.yes_rate === null ? "-" : `${Math.round(v.yes_rate * 100)}%`} (n={v.n})
+              </span>
+            ))}
+            {summary.median_stated_max_wait !== null && (
+              <span>median max wait: {summary.median_stated_max_wait}m</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <label className="block space-y-1.5">
         <span className="text-xs font-medium uppercase tracking-wide text-ifasto-secondary">
