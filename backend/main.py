@@ -3,12 +3,13 @@
 import time
 from collections import defaultdict, deque
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import SessionLocal
+from app.database import SessionLocal, get_session
 
 from app.api import contact as contact_api
 from app.api import pricing as pricing_api
@@ -20,6 +21,7 @@ from app.api import settings as settings_api
 from app.api import surveys as surveys_api
 from app.api import websockets as ws_api
 from app.auth.users import auth_backend, current_active_user, fastapi_users, get_jwt_strategy
+from app.models.restaurant import Restaurant
 from app.models.user import User
 from app.schemas.user import UserRead, UserUpdate
 
@@ -115,6 +117,23 @@ async def health():
 async def me(user: User = Depends(current_active_user)):
     """Currently-logged-in user. Frontend uses this to check session validity."""
     return user
+
+
+@app.get("/api/venue")
+async def my_venue(
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Display info for the signed-in user's venue: name, JA name, logo.
+    Powers the branded ops-board header."""
+    venue = await session.get(Restaurant, user.restaurant_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found.")
+    return {
+        "name": venue.name,
+        "name_ja": venue.name_ja,
+        "logo_url": venue.logo_url,
+    }
 
 
 @app.post("/api/auth/refresh")

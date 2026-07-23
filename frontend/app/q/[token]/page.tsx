@@ -104,6 +104,10 @@ export default function GuestJoinPage() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col">
+          {venue.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={venue.logo_url} alt="" className="h-14 w-14 object-contain mb-3" />
+          )}
           <h1 className="font-display text-3xl tracking-tight mb-1">{venueName}</h1>
           <p className="text-ifasto-secondary mb-8">{t.guest.waitingNow(venue.waiting)}</p>
 

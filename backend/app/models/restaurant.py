@@ -53,6 +53,10 @@ class Restaurant(Base):
     # Unguessable slug encoded in the door QR (app.ifasto.com/q/{qr_token}).
     # Separate from the UUID so it can be rotated if a QR leaks/abused.
     qr_token: Mapped[str | None] = mapped_column(String(48), unique=True, nullable=True)
+    # Per-venue logo shown on the ops board, QR sign, and guest pages. A path
+    # under the frontend's /public (e.g. /venues/menya.png) or a full URL.
+    # NULL renders the venue name alone.
+    logo_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

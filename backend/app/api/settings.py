@@ -64,6 +64,7 @@ def _qr_payload(venue: Restaurant) -> dict:
         "guest_url": f"https://app.ifasto.com/q/{venue.qr_token}" if venue.qr_token else None,
         "venue_name": venue.name,
         "venue_name_ja": venue.name_ja,
+        "logo_url": venue.logo_url,
     }
 
 

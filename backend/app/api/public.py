@@ -106,6 +106,7 @@ async def venue_info(
     return {
         "venue_name": venue.name,
         "venue_name_ja": venue.name_ja,
+        "logo_url": venue.logo_url,
         "waiting": state.total_waiting,
         "accepting": state.total_waiting < PUBLIC_JOIN_QUEUE_CAP,
     }

@@ -27,6 +27,7 @@ export interface QrInfo {
   guest_url: string;
   venue_name: string;
   venue_name_ja: string | null;
+  logo_url: string | null;
 }
 
 export const settingsApi = {

@@ -51,6 +51,9 @@ async def create_owner(
     restaurant_name_ja: str | None,
     venue_type: str,
     avg_check: int,
+    logo_url: str | None = None,
+    seat_count: int | None = None,
+    avg_turn_minutes: int | None = None,
 ) -> str:
     """Atomically: create restaurant + default settings + owner user. Return
     the cleartext password so we can print it once."""
@@ -65,6 +68,9 @@ async def create_owner(
             avg_check_size=avg_check,
             currency="JPY",
             qr_token=secrets.token_urlsafe(18),
+            logo_url=logo_url,
+            **({"seat_count": seat_count} if seat_count is not None else {}),
+            **({"avg_turn_minutes": avg_turn_minutes} if avg_turn_minutes is not None else {}),
         )
         session.add(restaurant)
         await session.flush()  # populate restaurant.id
@@ -179,6 +185,17 @@ async def rotate_qr(restaurant_name: str) -> str:
         venue.qr_token = secrets.token_urlsafe(18)
         await session.commit()
         return venue.qr_token
+
+
+async def set_venue_logo(restaurant_name: str, logo_url: str | None) -> None:
+    async with SessionLocal() as session:
+        venue = (await session.execute(
+            select(Restaurant).where(Restaurant.name == restaurant_name)
+        )).scalar_one_or_none()
+        if venue is None:
+            raise SystemExit(f"no restaurant named {restaurant_name!r}")
+        venue.logo_url = logo_url
+        await session.commit()
 
 
 async def set_superuser(email: str, enabled: bool) -> None:
@@ -363,6 +380,9 @@ def main() -> None:
         choices=[t.value for t in VenueType],
     )
     co.add_argument("--avg-check", type=int, required=True, help="Average per-person check, in yen")
+    co.add_argument("--logo-url", default=None, help="Logo path/URL (e.g. /venues/menya.png)")
+    co.add_argument("--seat-count", type=int, default=None)
+    co.add_argument("--avg-turn-minutes", type=int, default=None)
 
     ex = sub.add_parser(
         "export-training-data",
@@ -382,6 +402,10 @@ def main() -> None:
     hz.add_argument("--out", default=None, help="Output path (default: stdout)")
     hz.add_argument("--include-test", action="store_true")
 
+    sl = sub.add_parser("set-venue-logo", help="Set or clear a venue's logo_url")
+    sl.add_argument("--restaurant-name", required=True)
+    sl.add_argument("--logo-url", default=None, help="Path/URL; omit to clear")
+
     rq = sub.add_parser(
         "rotate-qr",
         help="Mint or rotate a venue's guest QR token (invalidates the old QR)",
@@ -397,6 +421,11 @@ def main() -> None:
     if args.cmd == "set-superuser":
         asyncio.run(set_superuser(args.email, not args.revoke))
         print(f"{args.email}: is_superuser={'False' if args.revoke else 'True'}")
+        return
+
+    if args.cmd == "set-venue-logo":
+        asyncio.run(set_venue_logo(args.restaurant_name, args.logo_url))
+        print(f"{args.restaurant_name}: logo_url={args.logo_url}")
         return
 
     if args.cmd == "rotate-qr":
@@ -424,6 +453,9 @@ def main() -> None:
                 restaurant_name_ja=args.restaurant_name_ja,
                 venue_type=args.venue_type,
                 avg_check=args.avg_check,
+                logo_url=args.logo_url,
+                seat_count=args.seat_count,
+                avg_turn_minutes=args.avg_turn_minutes,
             )
         )
         print()

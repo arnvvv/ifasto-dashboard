@@ -84,6 +84,10 @@ export default function QrSignPage() {
           locals and tourists regardless of the dashboard locale. */}
       {qr && (
         <div className="bg-white border border-ifasto-border rounded-lg p-10 flex flex-col items-center text-center print:border-0 print:rounded-none print:p-0 print:min-h-dvh print:justify-center">
+          {qr.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qr.logo_url} alt="" className="h-16 w-16 object-contain mb-3" />
+          )}
           <p className="font-display text-3xl tracking-tight mb-1">
             {qr.venue_name_ja ?? qr.venue_name}
           </p>

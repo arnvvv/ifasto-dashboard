@@ -6,6 +6,7 @@ import { API_BASE } from "./api";
 export interface PublicVenue {
   venue_name: string;
   venue_name_ja: string | null;
+  logo_url: string | null;
   waiting: number;
   accepting: boolean;
 }

@@ -16,6 +16,7 @@ import {
 import { useQueue } from "@/lib/useQueue";
 import { pricingApi, formatPrice, type PriceResponse } from "@/lib/pricing";
 import { settingsApi, type VenueSettings } from "@/lib/settings";
+import { venueApi, type Venue } from "@/lib/venue";
 import LivePriceTile from "./LivePriceTile";
 import { useT } from "@/lib/LocaleContext";
 
@@ -109,6 +110,7 @@ export default function OpsPage() {
   // Venue settings — pause state drives the header toggle; caps live in the
   // drawer. Staff see state but only owner/manager can change it.
   const [settings, setSettings] = useState<VenueSettings | null>(null);
+  const [venue, setVenue] = useState<Venue | null>(null);
   const [showCaps, setShowCaps] = useState(false);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const canEditSettings = user?.role === "owner" || user?.role === "manager";
@@ -116,6 +118,7 @@ export default function OpsPage() {
   useEffect(() => {
     if (!token) return;
     settingsApi.get(token).then(setSettings).catch(() => setSettings(null));
+    venueApi.get(token).then(setVenue).catch(() => setVenue(null));
   }, [token]);
 
   async function togglePause() {
@@ -186,13 +189,24 @@ export default function OpsPage() {
     <main className="flex-1 flex flex-col">
       <header className="border-b border-ifasto-border px-4 sm:px-6 py-3 sm:py-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-display text-xl sm:text-2xl tracking-tight leading-none truncate">
-              {t.ops.title}
-            </p>
-            <p className="text-xs text-ifasto-secondary mt-1 truncate">
-              {t.ops.signedInAs(user.name)} · {t.common.roleLabel(user.role)}
-            </p>
+          <div className="flex items-center gap-3 min-w-0">
+            {venue?.logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={venue.logo_url}
+                alt=""
+                className="h-9 w-9 sm:h-11 sm:w-11 rounded-md object-contain shrink-0"
+              />
+            )}
+            <div className="min-w-0">
+              <p className="font-display text-xl sm:text-2xl tracking-tight leading-none truncate">
+                {venue ? (locale === "ja" ? (venue.name_ja ?? venue.name) : venue.name) : t.ops.title}
+              </p>
+              <p className="text-xs text-ifasto-secondary mt-1 truncate">
+                {venue ? "ifasto 受付ボード · " : ""}
+                {t.ops.signedInAs(user.name)} · {t.common.roleLabel(user.role)}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <span
