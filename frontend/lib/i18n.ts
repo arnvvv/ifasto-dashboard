@@ -63,6 +63,7 @@ export interface Dict {
     history: string;
     survey: string;
     account: string;
+    menu: string;
 
     tileWaiting: string;
     tileRegular: string;
@@ -295,6 +296,7 @@ export const ja: Dict = {
     history: "履歴",
     survey: "調査",
     account: "アカウント",
+    menu: "メニュー",
 
     tileWaiting: "待ち組数",
     tileRegular: "通常",
@@ -527,6 +529,7 @@ export const en: Dict = {
     history: "History",
     survey: "Survey",
     account: "Account",
+    menu: "Menu",
 
     tileWaiting: "Waiting",
     tileRegular: "Regular",

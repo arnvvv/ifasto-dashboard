@@ -38,6 +38,9 @@ export default function OpsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [quickBusy, setQuickBusy] = useState<number | null>(null);
+  // Mobile-only: the management links collapse into a single "More" menu so
+  // the floor view stays uncluttered. Desktop shows them inline.
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // 30-second undo window after seat/walk (fat-finger protection).
   const [undoState, setUndoState] = useState<{
@@ -213,7 +216,7 @@ export default function OpsPage() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3">
           {settings && (
             <button
               onClick={() => void togglePause()}
@@ -225,7 +228,7 @@ export default function OpsPage() {
                     : t.ops.pauseTooltipOn
                   : t.ops.ownerOnly
               }
-              className={`px-3 py-2 rounded-md text-xs font-mono font-medium border transition-colors ${
+              className={`px-3 py-2 rounded-md text-xs font-mono font-medium border transition-colors min-w-0 truncate ${
                 settings.premium_paused
                   ? "bg-amber-100 border-amber-300 text-amber-800"
                   : "bg-emerald-50 border-emerald-200 text-emerald-700"
@@ -234,60 +237,87 @@ export default function OpsPage() {
               {settings.premium_paused ? t.ops.premiumPaused : t.ops.premiumOn}
             </button>
           )}
-          {canEditSettings && (
-            <button
-              onClick={() => setShowCaps((v) => !v)}
-              className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
-              title={t.ops.caps}
-            >
-              {t.ops.caps}
-            </button>
-          )}
-          <a
-            href="/ops/help"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
-          >
-            {t.ops.help}
-          </a>
-          <a
-            href="/ops/qr"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
-          >
-            {t.ops.qrSign}
-          </a>
-          <a
-            href="/ops/history"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
-          >
-            {t.ops.history}
-          </a>
-          <a
-            href="/ops/survey"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
-          >
-            {t.ops.survey}
-          </a>
-          <a
-            href="/ops/account"
-            className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
-          >
-            {t.ops.account}
-          </a>
-          {user.is_superuser && (
-            <a
-              href="/ops/admin"
-              className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
-            >
-              Admin
+
+          {/* Desktop: all management links inline (unchanged). */}
+          <div className="hidden sm:flex sm:flex-1 items-center gap-2 sm:gap-3 flex-wrap">
+            {canEditSettings && (
+              <button
+                onClick={() => setShowCaps((v) => !v)}
+                className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1"
+                title={t.ops.caps}
+              >
+                {t.ops.caps}
+              </button>
+            )}
+            <a href="/ops/help" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
+              {t.ops.help}
             </a>
-          )}
-          <button
-            onClick={() => setLocale(locale === "ja" ? "en" : "ja")}
-            className="ml-auto text-xs font-mono border border-ifasto-border rounded px-2.5 py-1.5 text-ifasto-secondary hover:text-ifasto-text hover:border-ifasto-text transition-colors"
-            title={locale === "ja" ? "Switch to English" : "日本語に切り替え"}
-          >
-            {locale === "ja" ? "EN" : "日本語"}
-          </button>
+            <a href="/ops/qr" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
+              {t.ops.qrSign}
+            </a>
+            <a href="/ops/history" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
+              {t.ops.history}
+            </a>
+            <a href="/ops/survey" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
+              {t.ops.survey}
+            </a>
+            <a href="/ops/account" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
+              {t.ops.account}
+            </a>
+            {user.is_superuser && (
+              <a href="/ops/admin" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
+                Admin
+              </a>
+            )}
+            <button
+              onClick={() => setLocale(locale === "ja" ? "en" : "ja")}
+              className="ml-auto text-xs font-mono border border-ifasto-border rounded px-2.5 py-1.5 text-ifasto-secondary hover:text-ifasto-text hover:border-ifasto-text transition-colors"
+              title={locale === "ja" ? "Switch to English" : "日本語に切り替え"}
+            >
+              {locale === "ja" ? "EN" : "日本語"}
+            </button>
+          </div>
+
+          {/* Mobile: one "More" menu keeps the floor view clean. */}
+          <div className="relative ml-auto sm:hidden shrink-0">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-expanded={menuOpen}
+              className="flex items-center gap-1 text-sm text-ifasto-secondary border border-ifasto-border rounded-md px-3 py-2 hover:border-ifasto-text transition-colors"
+            >
+              {t.ops.menu}
+              <span className="text-[10px] leading-none">▾</span>
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-44 bg-white border border-ifasto-border rounded-lg shadow-lg py-1.5 flex flex-col">
+                  {canEditSettings && (
+                    <button
+                      onClick={() => { setShowCaps(true); setMenuOpen(false); }}
+                      className="text-left px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg"
+                    >
+                      {t.ops.caps}
+                    </button>
+                  )}
+                  <a href="/ops/help" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.help}</a>
+                  <a href="/ops/qr" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.qrSign}</a>
+                  <a href="/ops/history" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.history}</a>
+                  <a href="/ops/survey" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.survey}</a>
+                  <a href="/ops/account" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.account}</a>
+                  {user.is_superuser && (
+                    <a href="/ops/admin" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">Admin</a>
+                  )}
+                  <button
+                    onClick={() => { setLocale(locale === "ja" ? "en" : "ja"); setMenuOpen(false); }}
+                    className="text-left px-4 py-2.5 mt-1 pt-2.5 border-t border-ifasto-border text-sm text-ifasto-secondary hover:bg-ifasto-bg"
+                  >
+                    {locale === "ja" ? "English" : "日本語"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -309,25 +339,36 @@ export default function OpsPage() {
         />
       )}
 
-      <section className="px-4 sm:px-6 py-4 sm:py-5 border-b border-ifasto-border grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
+      {/* Floor-priority metrics. Mobile shows the four that drive decisions
+          as a clean 2x2; the rest reveal on larger screens. */}
+      <section className="px-4 sm:px-6 py-3.5 sm:py-5 border-b border-ifasto-border grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-x-3 gap-y-3 sm:gap-4">
         <Stat label={t.ops.tileWaiting} value={state?.total_waiting ?? entries.length} />
-        <Stat label={t.ops.tileRegular} value={state?.regular_waiting ?? regular.length} />
         <Stat label={t.ops.tilePremium} value={state?.premium_waiting ?? premium.length} />
-        <Stat
-          label={t.ops.tileMedianWait}
-          value={
-            state?.median_wait_today_mins != null
-              ? t.common.minutes(Math.round(state.median_wait_today_mins))
-              : "—"
-          }
-        />
-        {token && <LivePriceTile token={token} partySize={2} active />}
         <Stat label={t.ops.tileSeatedToday} value={state?.seated_today ?? 0} />
         <Stat
           label={t.ops.tilePremiumToday}
           value={formatYen(state?.premium_revenue_today ?? 0)}
           accent
         />
+        <Stat
+          className="hidden sm:block"
+          label={t.ops.tileRegular}
+          value={state?.regular_waiting ?? regular.length}
+        />
+        <Stat
+          className="hidden sm:block"
+          label={t.ops.tileMedianWait}
+          value={
+            state?.median_wait_today_mins != null
+              ? t.common.minutes(Math.round(state.median_wait_today_mins))
+              : "-"
+          }
+        />
+        {token && (
+          <div className="hidden lg:block">
+            <LivePriceTile token={token} partySize={2} active />
+          </div>
+        )}
       </section>
 
       <section className="px-4 sm:px-6 py-3 border-b border-ifasto-border flex items-center gap-2 sm:gap-3">
@@ -456,18 +497,20 @@ function Stat({
   label,
   value,
   accent = false,
+  className = "",
 }: {
   label: string;
   value: string | number;
   accent?: boolean;
+  className?: string;
 }) {
   return (
-    <div>
-      <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary">
+    <div className={className}>
+      <p className="text-[11px] sm:text-xs font-mono uppercase tracking-widest text-ifasto-secondary truncate">
         {label}
       </p>
       <p
-        className={`font-display text-2xl mt-0.5 ${
+        className={`font-display text-2xl mt-0.5 tabular-nums ${
           accent ? "text-ifasto-amber" : ""
         }`}
       >
