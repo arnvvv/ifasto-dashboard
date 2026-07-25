@@ -101,7 +101,7 @@ export default function HelpPage() {
           <p className="font-display text-2xl tracking-tight leading-none">
             {heading}
           </p>
-          <p className="text-xs text-ifasto-secondary mt-1">ifasto</p>
+          <p className="text-xs text-ifasto-secondary mt-1" translate="no">ifasto</p>
         </div>
         <div className="flex items-center gap-4 print:hidden">
           <button

@@ -90,7 +90,7 @@ export default function AdminPage() {
     <main className="min-h-dvh px-5 py-6 max-w-5xl mx-auto w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-display text-2xl tracking-tight">ifasto admin</h1>
+          <h1 className="font-display text-2xl tracking-tight" translate="no">ifasto admin</h1>
           <p className="text-sm text-ifasto-secondary mt-1">
             All venues, today (JST{data ? ` ${data.date_jst}` : ""}). Refreshes every 30s.
           </p>

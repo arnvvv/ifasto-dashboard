@@ -198,7 +198,7 @@ export default function OpsPage() {
                 className="h-9 w-9 sm:h-11 sm:w-11 rounded-md object-contain shrink-0"
               />
             )}
-            <div className="min-w-0">
+            <div className="min-w-0" translate="no">
               <p className="font-display text-xl sm:text-2xl tracking-tight leading-none truncate">
                 {venue ? (locale === "ja" ? (venue.name_ja ?? venue.name) : venue.name) : t.ops.title}
               </p>

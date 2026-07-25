@@ -45,7 +45,7 @@ export default function LoginPage() {
     <main className="flex-1 flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
-          <p className="font-display text-4xl tracking-tight">ifasto</p>
+          <p className="font-display text-4xl tracking-tight" translate="no">ifasto</p>
           <p className="text-sm text-ifasto-secondary">{t.login.subtitle}</p>
         </div>
 

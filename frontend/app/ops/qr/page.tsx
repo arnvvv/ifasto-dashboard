@@ -88,7 +88,7 @@ export default function QrSignPage() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={qr.logo_url} alt="" className="h-16 w-16 object-contain mb-3" />
           )}
-          <p className="font-display text-3xl tracking-tight mb-1">
+          <p className="font-display text-3xl tracking-tight mb-1" translate="no">
             {qr.venue_name_ja ?? qr.venue_name}
           </p>
           {qr.venue_name_ja && qr.venue_name !== qr.venue_name_ja && (
@@ -111,7 +111,7 @@ export default function QrSignPage() {
           <p className="font-mono text-xs text-ifasto-secondary break-all">
             {t.qrSign.urlLabel}: {qr.guest_url}
           </p>
-          <p className="font-display text-lg tracking-tight mt-6">ifasto</p>
+          <p className="font-display text-lg tracking-tight mt-6" translate="no">ifasto</p>
         </div>
       )}
     </main>

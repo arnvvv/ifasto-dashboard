@@ -85,7 +85,7 @@ export default function GuestJoinPage() {
   return (
     <main className="min-h-dvh flex flex-col px-5 py-6 max-w-md mx-auto w-full">
       <div className="flex items-center justify-between mb-8">
-        <p className="font-display text-xl tracking-tight">ifasto</p>
+        <p className="font-display text-xl tracking-tight" translate="no">ifasto</p>
         <button
           onClick={() => setLocale(locale === "ja" ? "en" : "ja")}
           className="text-sm text-ifasto-secondary border border-ifasto-border rounded-md px-3 py-1.5"
@@ -108,7 +108,7 @@ export default function GuestJoinPage() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={venue.logo_url} alt="" className="h-14 w-14 object-contain mb-3" />
           )}
-          <h1 className="font-display text-3xl tracking-tight mb-1">{venueName}</h1>
+          <h1 className="font-display text-3xl tracking-tight mb-1" translate="no">{venueName}</h1>
           <p className="text-ifasto-secondary mb-8">{t.guest.waitingNow(venue.waiting)}</p>
 
           <h2 className="text-base font-medium mb-3">{t.guest.partySize}</h2>
@@ -160,7 +160,7 @@ export default function GuestJoinPage() {
         </div>
       )}
 
-      <p className="text-xs text-ifasto-secondary text-center mt-10">{t.guest.poweredBy}</p>
+      <p className="text-xs text-ifasto-secondary text-center mt-10" translate="no">{t.guest.poweredBy}</p>
     </main>
   );
 }

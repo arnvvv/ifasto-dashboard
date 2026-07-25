@@ -80,7 +80,7 @@ export default function GuestTicketPage() {
   return (
     <main className="min-h-dvh flex flex-col px-5 py-6 max-w-md mx-auto w-full">
       <div className="flex items-center justify-between mb-8">
-        <p className="font-display text-xl tracking-tight">ifasto</p>
+        <p className="font-display text-xl tracking-tight" translate="no">ifasto</p>
         <button
           onClick={() => setLocale(locale === "ja" ? "en" : "ja")}
           className="text-sm text-ifasto-secondary border border-ifasto-border rounded-md px-3 py-1.5"
@@ -99,7 +99,7 @@ export default function GuestTicketPage() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col">
-          <p className="text-ifasto-secondary mb-1">{venueName}</p>
+          <p className="text-ifasto-secondary mb-1" translate="no">{venueName}</p>
           <h1 className="font-display text-2xl tracking-tight mb-8">{t.guest.ticketTitle}</h1>
 
           <div className="bg-white border border-ifasto-border rounded-lg p-8 text-center mb-6">
@@ -192,7 +192,7 @@ export default function GuestTicketPage() {
         </div>
       )}
 
-      <p className="text-xs text-ifasto-secondary text-center mt-10">{t.guest.poweredBy}</p>
+      <p className="text-xs text-ifasto-secondary text-center mt-10" translate="no">{t.guest.poweredBy}</p>
     </main>
   );
 }
