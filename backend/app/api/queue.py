@@ -7,6 +7,7 @@ broadcaster so connected live-ops boards update in real time.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, time, timedelta, timezone
 
@@ -26,6 +27,7 @@ from app.models.operations import (
 from app.models.restaurant import Restaurant
 from app.models.user import User
 from app.schemas.queue import QueueEntryCreate, QueueEntryRead, QueueState
+from app.services.caps import allowed_passes
 from app.services.engine_events import notify_engine
 from app.services.engine_payload import (
     build_engine_payload,
@@ -158,6 +160,22 @@ async def queue_state(
 # Write endpoints
 # ---------------------------------------------------------------------------
 
+# Per-venue async lock serializing premium-entry creation so the fast-pass
+# cap can't be raced past: two buyers both passing the check, both inserting,
+# and ending up with more active passes than the queue allows. Single-worker
+# deployment means one event loop, so this is authoritative. For a multi-worker
+# future, swap for a Postgres advisory lock (pg_advisory_xact_lock).
+_premium_locks: dict[uuid.UUID, asyncio.Lock] = {}
+
+
+def _premium_lock(restaurant_id: uuid.UUID) -> asyncio.Lock:
+    lock = _premium_locks.get(restaurant_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _premium_locks[restaurant_id] = lock
+    return lock
+
+
 async def create_entry(
     session: AsyncSession,
     restaurant_id: uuid.UUID,
@@ -199,38 +217,59 @@ async def create_entry(
             await predict_wait_best_effort(venue_config, queue_state)
         )
 
-    # Daily ticket number: max(today) + 1. Single-worker deployment makes
-    # this race-free in practice; move to a DB sequence per venue if the API
-    # ever runs multiple workers.
-    ticket_stmt = select(func.coalesce(func.max(QueueEntry.ticket_no), 0)).where(
-        QueueEntry.restaurant_id == restaurant_id,
-        QueueEntry.joined_at >= _today_start_utc(),
-    )
-    next_ticket = int((await session.execute(ticket_stmt)).scalar_one()) + 1
+    async def _assign_and_insert() -> QueueEntry:
+        # Daily ticket number: max(today) + 1.
+        ticket_stmt = select(func.coalesce(func.max(QueueEntry.ticket_no), 0)).where(
+            QueueEntry.restaurant_id == restaurant_id,
+            QueueEntry.joined_at >= _today_start_utc(),
+        )
+        next_ticket = int((await session.execute(ticket_stmt)).scalar_one()) + 1
+        entry = QueueEntry(
+            restaurant_id=restaurant_id,
+            ticket_no=next_ticket,
+            party_size=body.party_size,
+            entry_type=body.entry_type,
+            party_name=body.party_name,
+            phone=body.phone,
+            notes=body.notes,
+            skip_price=body.skip_price,
+            status=QueueEntryStatus.waiting,
+            queue_ahead_regular=pre_state.regular_waiting,
+            queue_ahead_premium=pre_state.premium_waiting,
+            queue_pressure_at_join=pressure_at_join,
+            predicted_wait_at_join=predicted_wait,
+            predicted_wait_p10_at_join=predicted_p10,
+            predicted_wait_p90_at_join=predicted_p90,
+            prediction_request_id=prediction_request_id,
+            pricing_session_id=body.pricing_session_id,
+            quoted_price=body.quoted_price,
+        )
+        session.add(entry)
+        await session.commit()
+        await session.refresh(entry)
+        return entry
 
-    entry = QueueEntry(
-        restaurant_id=restaurant_id,
-        ticket_no=next_ticket,
-        party_size=body.party_size,
-        entry_type=body.entry_type,
-        party_name=body.party_name,
-        phone=body.phone,
-        notes=body.notes,
-        skip_price=body.skip_price,
-        status=QueueEntryStatus.waiting,
-        queue_ahead_regular=pre_state.regular_waiting,
-        queue_ahead_premium=pre_state.premium_waiting,
-        queue_pressure_at_join=pressure_at_join,
-        predicted_wait_at_join=predicted_wait,
-        predicted_wait_p10_at_join=predicted_p10,
-        predicted_wait_p90_at_join=predicted_p90,
-        prediction_request_id=prediction_request_id,
-        pricing_session_id=body.pricing_session_id,
-        quoted_price=body.quoted_price,
-    )
-    session.add(entry)
-    await session.commit()
-    await session.refresh(entry)
+    if body.entry_type == QueueEntryType.premium:
+        # Enforce the fast-pass cap ATOMICALLY at creation (not only at quote
+        # time). The per-venue lock serializes concurrent buyers so two can't
+        # both slip past the same slot and end up as two active passes.
+        async with _premium_lock(restaurant_id):
+            cur = await compute_queue_state(session, restaurant_id)
+            cap = allowed_passes(cur.total_waiting)
+            if cur.premium_waiting >= cap:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    detail={
+                        "reason": "pass_cap_reached",
+                        "message": (
+                            f"Fast-pass limit reached: {cur.premium_waiting}/{cap} "
+                            f"for a queue of {cur.total_waiting}."
+                        ),
+                    },
+                )
+            entry = await _assign_and_insert()
+    else:
+        entry = await _assign_and_insert()
     # Keep the pricing engine's Redis counters in sync. Premium joins are a
     # queue_join + premium_purchase pair (purchase decrements the queue).
     if body.entry_type == QueueEntryType.premium:
