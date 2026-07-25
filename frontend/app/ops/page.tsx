@@ -834,6 +834,7 @@ function AddPartyModal({
                       ? ({
                           premium_paused: t.tile.paused,
                           large_party_cap_reached: t.tile.capReached,
+                          pass_cap_reached: t.tile.capReached,
                           out_of_service_hours: t.tile.outOfHours,
                           engine_unavailable: t.tile.engineOffline,
                           unavailable_hard_cap: t.tile.capReached,

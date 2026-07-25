@@ -55,6 +55,21 @@ from app.services.engine_payload import (
 router = APIRouter()
 
 
+# Queue-length schedule for how many fast passes may be ACTIVE (waiting,
+# unseated) at once. Floor of 1 so the very first pass is always sellable,
+# then one more per 5 parties beyond a queue of 10:
+#     queue  0-9  -> 1      queue 15-19 -> 3
+#     queue 10-14 -> 2      queue 20-24 -> 4   (and so on)
+# This is the venue's fairness cap for the pilot: clearer to explain to an
+# owner than a percentage, and it keeps the paid lane a small, growing slice
+# of the line. When a premium party is seated it leaves the queue and frees
+# a slot, so this bounds concurrency, not total sales per service.
+def allowed_passes(queue_len: int) -> int:
+    if queue_len < 10:
+        return 1
+    return 2 + (queue_len - 10) // 5
+
+
 # Engine's category split: parties > max_party_size_eligible are "large".
 # Mirroring it locally so we can short-circuit the per-category cap before
 # paying the round-trip to the engine.
@@ -134,6 +149,22 @@ async def quote_price(
             detail={
                 "reason": "premium_paused",
                 "message": "Skip pricing is paused for this venue.",
+            },
+        )
+
+    # Queue-length pass-count cap (the fairness schedule). Refuse once the
+    # active premium parties have filled the slots this queue length allows.
+    allowed = allowed_passes(qstate.total_waiting)
+    if qstate.premium_waiting >= allowed:
+        await _log_quote(session, restaurant_id, body, "pass_cap_reached", qstate)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "pass_cap_reached",
+                "message": (
+                    f"Fast-pass limit reached: {qstate.premium_waiting}/{allowed} "
+                    f"for a queue of {qstate.total_waiting}."
+                ),
             },
         )
 

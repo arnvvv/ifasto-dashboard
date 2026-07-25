@@ -25,6 +25,7 @@ export default function LivePriceTile({
   const reasonLabels: Record<string, string> = {
     premium_paused: t.tile.paused,
     large_party_cap_reached: t.tile.capReached,
+    pass_cap_reached: t.tile.capReached,
     engine_unavailable: t.tile.engineOffline,
     network: t.tile.offline,
     unavailable_hard_cap: t.tile.capReached,
