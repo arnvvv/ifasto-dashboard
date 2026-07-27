@@ -16,8 +16,8 @@ def allowed_passes(queue_len: int) -> int:
     return 2 + (queue_len - 10) // 5
 
 
-# Guest-facing fast pass only displays once the queue is worth skipping.
-# Below this, the offer reports queue_too_short and the card hides itself;
-# it reappears automatically the moment the line reaches the threshold.
-# (Staff can always sell a pass manually from the board regardless.)
-MIN_FASTPASS_QUEUE = 5
+# Founder decision 2026-07-28: the fast pass stays visible at ALL queue
+# lengths (0 disables the display threshold). The queue still shapes the
+# PRICE (short line = cheap pass), and the cap schedule still limits how
+# many can be active. Raise this if short-queue offers ever test poorly.
+MIN_FASTPASS_QUEUE = 0
