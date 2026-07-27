@@ -24,6 +24,7 @@ export interface PublicEntry {
   venue_name_ja: string | null;
   entry_type: "regular" | "premium";
   paid_amount: number | null;
+  paid_online: boolean;
 }
 
 export class PublicApiError extends Error {
@@ -111,4 +112,38 @@ export function clearTicket(): void {
   } catch {
     // ignore
   }
+}
+
+// --- Guest self-serve fast pass ---
+
+export interface FastpassOffer {
+  enabled: boolean;
+  available?: boolean;
+  reason?: string;
+  payment_mode?: "register" | "stripe";
+  price_minor?: number;
+  currency?: string;
+  predicted_wait_mins?: number | null;
+}
+
+export type FastpassAcceptResult =
+  | ({ mode: "register" } & PublicEntry)
+  | { mode: "stripe"; checkout_url: string };
+
+export function getFastpassOffer(token: string, partySize: number): Promise<FastpassOffer> {
+  return req(`/api/public/venue/${encodeURIComponent(token)}/fastpass?party_size=${partySize}`);
+}
+
+export function acceptFastpass(token: string, partySize: number): Promise<FastpassAcceptResult> {
+  return req(`/api/public/venue/${encodeURIComponent(token)}/fastpass/accept`, {
+    method: "POST",
+    body: JSON.stringify({ party_size: partySize }),
+  });
+}
+
+export function completeFastpass(token: string, checkoutSessionId: string): Promise<PublicEntry> {
+  return req(`/api/public/fastpass/complete`, {
+    method: "POST",
+    body: JSON.stringify({ qr_token: token, checkout_session_id: checkoutSessionId }),
+  });
 }

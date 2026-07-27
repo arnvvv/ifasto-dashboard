@@ -105,6 +105,15 @@ class VenueSettings(Base):
     max_party_size_eligible: Mapped[int] = mapped_column(Integer, default=4)
     large_party_cap_per_service: Mapped[int] = mapped_column(Integer, default=1)
     premium_paused: Mapped[bool] = mapped_column(Boolean, default=False)  # the big pause button
+    # --- Guest self-serve fast pass (flagged; default OFF => nothing changes) ---
+    # fastpass_guest_enabled: guests see the paid option on the QR page.
+    # payment_mode: 'register' (pass issues now, staff collects at till) or
+    # 'stripe' (pass issues only after Stripe Checkout payment succeeds).
+    # stripe_secret_key: the VENUE'S OWN restricted key (rk_...), set via CLI
+    # only — never exposed through any API schema. ifasto holds no funds.
+    fastpass_guest_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    payment_mode: Mapped[str] = mapped_column(String(10), default="register")
+    stripe_secret_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Per-venue pricing-curve overrides, forwarded verbatim to the engine's
     # venue_config.pricing_overrides (schema validated engine-side). This is
     # the write target for calibration outputs — curve tuning without an

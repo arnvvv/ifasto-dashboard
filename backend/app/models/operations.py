@@ -96,6 +96,9 @@ class QueueEntry(Base):
     # price_quote_logs.session_id. quoted_price = what the engine quoted;
     # skip_price = what the operator actually charged (override is signal).
     pricing_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Stripe Checkout session that paid for this entry (digital fast pass).
+    # UNIQUE => a checkout session can fulfil at most one entry (idempotency).
+    stripe_checkout_id: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
     quoted_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     restaurant: Mapped["Restaurant"] = relationship(back_populates="queue_entries")

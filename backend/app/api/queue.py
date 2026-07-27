@@ -180,6 +180,7 @@ async def create_entry(
     session: AsyncSession,
     restaurant_id: uuid.UUID,
     body: QueueEntryCreate,
+    enforce_premium_cap: bool = True,
 ) -> QueueEntry:
     """Shared join path — used by the staff endpoint AND the public guest QR
     endpoint, so both produce identical training capture, ticket numbers,
@@ -249,10 +250,13 @@ async def create_entry(
         await session.refresh(entry)
         return entry
 
-    if body.entry_type == QueueEntryType.premium:
+    if body.entry_type == QueueEntryType.premium and enforce_premium_cap:
         # Enforce the fast-pass cap ATOMICALLY at creation (not only at quote
         # time). The per-venue lock serializes concurrent buyers so two can't
         # both slip past the same slot and end up as two active passes.
+        # enforce_premium_cap=False exists for ONE caller: Stripe fulfilment,
+        # where the guest already paid — acceptance re-checked the cap moments
+        # before checkout began, and a paid guest is always honored.
         async with _premium_lock(restaurant_id):
             cur = await compute_queue_state(session, restaurant_id)
             cap = allowed_passes(cur.total_waiting)

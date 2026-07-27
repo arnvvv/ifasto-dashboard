@@ -7,11 +7,14 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  acceptFastpass,
+  getFastpassOffer,
   getVenue,
   joinQueue,
   loadTicket,
   saveTicket,
   PublicApiError,
+  type FastpassOffer,
   type PublicVenue,
 } from "@/lib/publicApi";
 import { useGuestLocale } from "@/lib/useGuestLocale";
@@ -26,11 +29,28 @@ export default function GuestJoinPage() {
   const [partySize, setPartySize] = useState(2);
   const [joining, setJoining] = useState(false);
   const [existingTicket, setExistingTicket] = useState<string | null>(null);
+  const [offer, setOffer] = useState<FastpassOffer | null>(null);
+  const [accepting, setAccepting] = useState(false);
 
   useEffect(() => {
     const stored = loadTicket();
     if (stored && stored.token === token) setExistingTicket(stored.entryId);
   }, [token]);
+
+  // Fast-pass offer: refetch when party size changes (price depends on it).
+  useEffect(() => {
+    let alive = true;
+    getFastpassOffer(token, partySize)
+      .then((o) => {
+        if (alive) setOffer(o);
+      })
+      .catch(() => {
+        if (alive) setOffer(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token, partySize]);
 
   useEffect(() => {
     let alive = true;
@@ -65,6 +85,30 @@ export default function GuestJoinPage() {
         setError("network");
       }
       setJoining(false);
+    }
+  }
+
+  async function handleFastpass() {
+    if (accepting || joining) return;
+    setAccepting(true);
+    setError(null);
+    try {
+      const res = await acceptFastpass(token, partySize);
+      if (res.mode === "stripe") {
+        window.location.href = res.checkout_url;
+        return;
+      }
+      saveTicket(res.entry_id, token);
+      router.replace(`/g/${res.entry_id}`);
+    } catch (e) {
+      if (e instanceof PublicApiError && e.status === 409) {
+        // Cap filled or paused between offer and accept — refresh the offer.
+        setOffer(null);
+        getFastpassOffer(token, partySize).then(setOffer).catch(() => {});
+      } else {
+        setError("network");
+      }
+      setAccepting(false);
     }
   }
 
@@ -147,6 +191,28 @@ export default function GuestJoinPage() {
           </button>
           {!venue.accepting && !errorText && (
             <p className="text-sm text-ifasto-secondary mt-3 text-center">{t.guest.queueFull}</p>
+          )}
+
+          {offer?.enabled && offer.available && offer.price_minor != null && venue.accepting && (
+            <button
+              onClick={handleFastpass}
+              disabled={accepting}
+              className="w-full mt-3 py-4 rounded-md border-2 border-ifasto-text bg-white text-left px-4 disabled:opacity-50"
+            >
+              <span className="block text-[11px] uppercase tracking-widest text-ifasto-secondary mb-1">
+                {t.guest.fastPass}
+              </span>
+              <span className="block text-lg font-semibold">
+                {accepting
+                  ? t.guest.fpAccepting
+                  : t.guest.fpSkipFor(`¥${offer.price_minor.toLocaleString()}`)}
+              </span>
+              {offer.payment_mode === "stripe" && (
+                <span className="block text-xs text-ifasto-secondary mt-1">
+                  {t.guest.fpPayOnline}
+                </span>
+              )}
+            </button>
           )}
 
           {existingTicket && (

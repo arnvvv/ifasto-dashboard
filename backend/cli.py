@@ -198,6 +198,33 @@ async def set_venue_logo(restaurant_name: str, logo_url: str | None) -> None:
         await session.commit()
 
 
+async def configure_fastpass(
+    restaurant_name: str,
+    enable: bool | None,
+    mode: str | None,
+    stripe_key: str | None,
+) -> None:
+    async with SessionLocal() as session:
+        venue = (await session.execute(
+            select(Restaurant).where(Restaurant.name == restaurant_name)
+        )).scalar_one_or_none()
+        if venue is None:
+            raise SystemExit(f"no restaurant named {restaurant_name!r}")
+        vs = await session.get(VenueSettings, venue.id)
+        if vs is None:
+            vs = VenueSettings(restaurant_id=venue.id)
+            session.add(vs)
+        if enable is not None:
+            vs.fastpass_guest_enabled = enable
+        if mode is not None:
+            vs.payment_mode = mode
+        if stripe_key is not None:
+            vs.stripe_secret_key = stripe_key or None
+        await session.commit()
+        print(f"{restaurant_name}: guest_fastpass={vs.fastpass_guest_enabled} "
+              f"mode={vs.payment_mode} stripe_key={'set' if vs.stripe_secret_key else 'none'}")
+
+
 async def set_superuser(email: str, enabled: bool) -> None:
     async with SessionLocal() as session:
         u = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
@@ -402,6 +429,13 @@ def main() -> None:
     hz.add_argument("--out", default=None, help="Output path (default: stdout)")
     hz.add_argument("--include-test", action="store_true")
 
+    fp = sub.add_parser("configure-fastpass", help="Guest self-serve fast pass: enable/disable, payment mode, Stripe key")
+    fp.add_argument("--restaurant-name", required=True)
+    fp.add_argument("--enable", action="store_true", default=None)
+    fp.add_argument("--disable", dest="enable", action="store_false")
+    fp.add_argument("--mode", choices=["register", "stripe"], default=None)
+    fp.add_argument("--stripe-key", default=None, help="Venue's restricted key (rk_...); empty string clears")
+
     sl = sub.add_parser("set-venue-logo", help="Set or clear a venue's logo_url")
     sl.add_argument("--restaurant-name", required=True)
     sl.add_argument("--logo-url", default=None, help="Path/URL; omit to clear")
@@ -421,6 +455,10 @@ def main() -> None:
     if args.cmd == "set-superuser":
         asyncio.run(set_superuser(args.email, not args.revoke))
         print(f"{args.email}: is_superuser={'False' if args.revoke else 'True'}")
+        return
+
+    if args.cmd == "configure-fastpass":
+        asyncio.run(configure_fastpass(args.restaurant_name, args.enable, args.mode, args.stripe_key))
         return
 
     if args.cmd == "set-venue-logo":

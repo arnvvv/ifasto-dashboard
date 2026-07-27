@@ -110,7 +110,9 @@ export default function GuestTicketPage() {
                 </span>
                 {entry.paid_amount !== null && (
                   <p className="text-sm text-ifasto-secondary mt-2">
-                    {t.guest.paid(`¥${entry.paid_amount.toLocaleString()}`)}
+                    {entry.status === "waiting" && !entry.paid_online
+                      ? t.guest.fpPayAtRegister(`¥${entry.paid_amount.toLocaleString()}`)
+                      : t.guest.paid(`¥${entry.paid_amount.toLocaleString()}`)}
                   </p>
                 )}
               </div>

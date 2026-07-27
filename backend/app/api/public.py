@@ -93,6 +93,9 @@ def _entry_public_view(entry: QueueEntry, parties_ahead: int, venue: Restaurant)
         # the guest ticket page (Model B — the restaurant collected the money).
         "entry_type": entry.entry_type.value,
         "paid_amount": entry.skip_price if entry.entry_type == QueueEntryType.premium else None,
+        # True when payment already happened online (Stripe); register-mode
+        # passes stay False until staff collects at seating.
+        "paid_online": entry.stripe_checkout_id is not None,
     }
 
 
@@ -191,3 +194,214 @@ async def entry_leave(
     await _broadcast(session, entry.restaurant_id, "walked_away", entry)
     venue = await session.get(Restaurant, entry.restaurant_id)
     return _entry_public_view(entry, 0, venue)
+
+
+# ---------------------------------------------------------------------------
+# Guest self-serve fast pass (flagged per venue; default OFF).
+#
+# register mode: pass issues immediately, guest pays at the till when seated.
+# stripe mode:  guest pays in Stripe Checkout on the VENUE'S OWN account
+#               (their restricted key — ifasto never touches funds); the pass
+#               issues only after the session reports paid. Fulfilment is
+#               idempotent via the unique stripe_checkout_id column.
+# ---------------------------------------------------------------------------
+
+import httpx as _httpx
+
+from app.api.queue import create_entry
+from app.schemas.queue import QueueEntryCreate
+from app.services.engine_payload import get_venue_settings
+from app.services.quote_service import QuoteRefused, get_quote
+
+STRIPE_API = "https://api.stripe.com/v1"
+
+_quote_hits: dict[str, deque] = defaultdict(deque)
+QUOTE_WINDOW_S = 60
+QUOTE_MAX_PER_WINDOW = 12
+
+
+def _quote_rate_ok(ip: str) -> bool:
+    now = time.monotonic()
+    bucket = _quote_hits[ip]
+    while bucket and now - bucket[0] > QUOTE_WINDOW_S:
+        bucket.popleft()
+    if len(bucket) >= QUOTE_MAX_PER_WINDOW:
+        return False
+    bucket.append(now)
+    if len(_quote_hits) > 10_000:
+        _quote_hits.clear()
+    return True
+
+
+class FastpassAccept(BaseModel):
+    party_size: int = Field(ge=1, le=8)
+
+
+class FastpassComplete(BaseModel):
+    qr_token: str = Field(min_length=1, max_length=48)
+    checkout_session_id: str = Field(min_length=1, max_length=80)
+
+
+@router.get("/venue/{qr_token}/fastpass")
+async def fastpass_offer(
+    qr_token: str,
+    request: Request,
+    party_size: int = 2,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """The guest-facing offer: is the paid lane on, and at what price right
+    now. Refusals return enabled=True with a reason so the UI can hide the
+    card gracefully rather than erroring."""
+    venue = await _venue_by_token(session, qr_token)
+    vs = await get_venue_settings(session, venue.id)
+    if not vs.fastpass_guest_enabled:
+        return {"enabled": False}
+    if not 1 <= party_size <= 8:
+        raise HTTPException(status_code=422, detail="party_size out of range.")
+    if not _quote_rate_ok(_client_ip(request)):
+        raise HTTPException(status_code=429, detail="Too many requests.")
+    try:
+        q = await get_quote(session, venue.id, party_size, source="guest_offer")
+    except QuoteRefused as exc:
+        return {"enabled": True, "available": False, "reason": exc.reason}
+    return {
+        "enabled": True,
+        "available": True,
+        "payment_mode": vs.payment_mode,
+        "price_minor": q["price_minor"],
+        "currency": q.get("currency", "JPY"),
+        "predicted_wait_mins": q.get("predicted_wait_mins"),
+        "session_id": q.get("session_id"),
+    }
+
+
+@router.post("/venue/{qr_token}/fastpass/accept", status_code=201)
+async def fastpass_accept(
+    qr_token: str,
+    body: FastpassAccept,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Guest accepts the fast pass. The price is ALWAYS re-quoted server-side
+    at this moment — the client never supplies it."""
+    venue = await _venue_by_token(session, qr_token)
+    vs = await get_venue_settings(session, venue.id)
+    if not vs.fastpass_guest_enabled:
+        raise HTTPException(status_code=404, detail="Not available.")
+    if not _quote_rate_ok(_client_ip(request)):
+        raise HTTPException(status_code=429, detail="Too many requests.")
+
+    try:
+        q = await get_quote(session, venue.id, body.party_size, source="guest_accept")
+    except QuoteRefused as exc:
+        raise HTTPException(status_code=409, detail={"reason": exc.reason, "message": exc.message})
+
+    price = int(q["price_minor"])
+
+    if vs.payment_mode == "stripe" and vs.stripe_secret_key:
+        # Create a Checkout Session on the venue's own Stripe account.
+        # Wallets (Apple Pay / Google Pay) surface automatically on the
+        # hosted page; no per-domain registration needed.
+        success = (
+            "https://app.ifasto.com/g/pay/complete"
+            f"?token={qr_token}&cs={{CHECKOUT_SESSION_ID}}"
+        )
+        form = {
+            "mode": "payment",
+            "success_url": success,
+            "cancel_url": f"https://app.ifasto.com/q/{qr_token}",
+            "line_items[0][price_data][currency]": "jpy",
+            "line_items[0][price_data][unit_amount]": str(price),
+            "line_items[0][price_data][product_data][name]": f"Fast pass — {venue.name}",
+            "line_items[0][quantity]": "1",
+            "metadata[qr_token]": qr_token,
+            "metadata[party_size]": str(body.party_size),
+            "metadata[price_minor]": str(price),
+            "expires_at": str(int(time.time()) + 35 * 60),  # Stripe min ~30min
+        }
+        try:
+            async with _httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(
+                    f"{STRIPE_API}/checkout/sessions",
+                    data=form,
+                    auth=(vs.stripe_secret_key, ""),
+                )
+                resp.raise_for_status()
+                cs = resp.json()
+        except _httpx.HTTPError:
+            raise HTTPException(
+                status_code=503,
+                detail={"reason": "payment_unavailable",
+                        "message": "Payment provider did not respond."},
+            )
+        return {"mode": "stripe", "checkout_url": cs["url"]}
+
+    # register mode: issue the pass now; staff collects at the till.
+    entry = await create_entry(session, venue.id, QueueEntryCreate(
+        party_size=body.party_size,
+        entry_type=QueueEntryType.premium,
+        skip_price=price,
+        quoted_price=price,
+        pricing_session_id=q.get("session_id"),
+    ))
+    ahead = await _parties_ahead(session, entry)
+    return {"mode": "register", **_entry_public_view(entry, ahead, venue)}
+
+
+@router.post("/fastpass/complete")
+async def fastpass_complete(
+    body: FastpassComplete,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Stripe redirect target. Verifies the checkout session against the
+    venue's own account and fulfils the pass exactly once."""
+    venue = await _venue_by_token(session, body.qr_token)
+    vs = await get_venue_settings(session, venue.id)
+    if not vs.stripe_secret_key:
+        raise HTTPException(status_code=404, detail="Not available.")
+
+    # Idempotency first: fulfilled already?
+    existing = (await session.execute(
+        select(QueueEntry).where(QueueEntry.stripe_checkout_id == body.checkout_session_id)
+    )).scalar_one_or_none()
+    if existing is not None:
+        ahead = await _parties_ahead(session, existing) if existing.status == QueueEntryStatus.waiting else 0
+        return _entry_public_view(existing, ahead, venue)
+
+    try:
+        async with _httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{STRIPE_API}/checkout/sessions/{body.checkout_session_id}",
+                auth=(vs.stripe_secret_key, ""),
+            )
+            resp.raise_for_status()
+            cs = resp.json()
+    except _httpx.HTTPError:
+        raise HTTPException(status_code=503, detail="Payment provider did not respond.")
+
+    meta = cs.get("metadata") or {}
+    if cs.get("payment_status") != "paid":
+        raise HTTPException(status_code=402, detail="Payment not completed.")
+    if meta.get("qr_token") != body.qr_token:
+        raise HTTPException(status_code=409, detail="Session does not match venue.")
+
+    price = int(meta.get("price_minor") or cs.get("amount_total") or 0)
+    party = int(meta.get("party_size") or 2)
+
+    # The guest PAID: honor the pass even if the cap filled while they were
+    # in checkout (rare; bounded by checkout expiry). Entry creation runs the
+    # same path as every other join for capture + broadcast, so we bypass
+    # only the cap here, deliberately, by calling create_entry directly —
+    # its premium cap applies to guest-accept, and acceptance already
+    # re-checked it moments before payment began.
+    entry = await create_entry(session, venue.id, QueueEntryCreate(
+        party_size=party,
+        entry_type=QueueEntryType.premium,
+        skip_price=price,
+        quoted_price=price,
+    ), enforce_premium_cap=False)
+    entry.stripe_checkout_id = body.checkout_session_id
+    await session.commit()
+    await session.refresh(entry)
+    ahead = await _parties_ahead(session, entry)
+    return _entry_public_view(entry, ahead, venue)

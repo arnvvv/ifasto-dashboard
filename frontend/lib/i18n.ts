@@ -216,6 +216,13 @@ export interface Dict {
     poweredBy: string;
     fastPass: string;
     paid: (amount: string) => string;
+    fpSkipFor: (price: string) => string;
+    fpSeatedSoon: string;
+    fpPayAtRegister: (price: string) => string;
+    fpPayOnline: string;
+    fpAccepting: string;
+    fpCompleting: string;
+    fpPayFailed: string;
   };
   statement: {
     title: string;
@@ -450,6 +457,13 @@ export const ja: Dict = {
     poweredBy: "Powered by ifasto",
     fastPass: "ファストパス",
     paid: (amount) => `お支払い済み ${amount}`,
+    fpSkipFor: (price) => `${price}で並ばずに入店`,
+    fpSeatedSoon: "まもなくご案内",
+    fpPayAtRegister: (price) => `ご案内時に店頭でお支払い：${price}`,
+    fpPayOnline: "オンラインで支払う（Apple Pay / カード）",
+    fpAccepting: "手続き中…",
+    fpCompleting: "お支払いを確認しています…",
+    fpPayFailed: "お支払いを確認できませんでした。店頭スタッフにお声がけください。",
   },
   statement: {
     title: "月次明細",
@@ -683,6 +697,13 @@ export const en: Dict = {
     poweredBy: "Powered by ifasto",
     fastPass: "Fast pass",
     paid: (amount) => `Paid ${amount}`,
+    fpSkipFor: (price) => `Skip the wait for ${price}`,
+    fpSeatedSoon: "Seated shortly",
+    fpPayAtRegister: (price) => `Pay at the register when seated: ${price}`,
+    fpPayOnline: "Pay online (Apple Pay / card)",
+    fpAccepting: "Processing…",
+    fpCompleting: "Confirming your payment…",
+    fpPayFailed: "We could not confirm the payment. Please see the staff.",
   },
   statement: {
     title: "Monthly statement",
