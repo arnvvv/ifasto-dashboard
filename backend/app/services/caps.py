@@ -14,3 +14,10 @@ def allowed_passes(queue_len: int) -> int:
     if queue_len < 10:
         return 1
     return 2 + (queue_len - 10) // 5
+
+
+# Guest-facing fast pass only displays once the queue is worth skipping.
+# Below this, the offer reports queue_too_short and the card hides itself;
+# it reappears automatically the moment the line reaches the threshold.
+# (Staff can always sell a pass manually from the board regardless.)
+MIN_FASTPASS_QUEUE = 5

@@ -211,6 +211,7 @@ import httpx as _httpx
 from app.api.queue import create_entry
 from app.schemas.queue import QueueEntryCreate
 from app.services.engine_payload import get_venue_settings
+from app.services.caps import MIN_FASTPASS_QUEUE
 from app.services.quote_service import QuoteRefused, get_quote
 
 STRIPE_API = "https://api.stripe.com/v1"
@@ -260,6 +261,9 @@ async def fastpass_offer(
         raise HTTPException(status_code=422, detail="party_size out of range.")
     if not _quote_rate_ok(_client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many requests.")
+    state = await compute_queue_state(session, venue.id)
+    if state.total_waiting < MIN_FASTPASS_QUEUE:
+        return {"enabled": True, "available": False, "reason": "queue_too_short"}
     try:
         q = await get_quote(session, venue.id, party_size, source="guest_offer")
     except QuoteRefused as exc:
@@ -290,6 +294,13 @@ async def fastpass_accept(
         raise HTTPException(status_code=404, detail="Not available.")
     if not _quote_rate_ok(_client_ip(request)):
         raise HTTPException(status_code=429, detail="Too many requests.")
+
+    state = await compute_queue_state(session, venue.id)
+    if state.total_waiting < MIN_FASTPASS_QUEUE:
+        raise HTTPException(status_code=409, detail={
+            "reason": "queue_too_short",
+            "message": "The line is short right now; please join the regular queue.",
+        })
 
     try:
         q = await get_quote(session, venue.id, body.party_size, source="guest_accept")
