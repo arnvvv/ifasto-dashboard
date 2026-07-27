@@ -53,7 +53,9 @@ export default function SurveyPage() {
 
   useEffect(() => {
     if (!authLoading && !token) router.replace("/login");
-  }, [authLoading, token, router]);
+    // Founder field tool: venue accounts get bounced to their board.
+    if (!authLoading && user && !user.is_superuser) router.replace("/ops");
+  }, [authLoading, token, user, router]);
 
   useEffect(() => {
     if (!token) return;

@@ -272,9 +272,11 @@ export default function OpsPage() {
             <a href="/ops/history" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
               {t.ops.history}
             </a>
-            <a href="/ops/survey" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
-              {t.ops.survey}
-            </a>
+            {user.is_superuser && (
+              <a href="/ops/survey" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
+                {t.ops.survey}
+              </a>
+            )}
             <a href="/ops/account" className="text-sm text-ifasto-secondary hover:text-ifasto-text transition-colors py-2 px-1">
               {t.ops.account}
             </a>
@@ -317,7 +319,9 @@ export default function OpsPage() {
                   <a href="/ops/help" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.help}</a>
                   <a href="/ops/qr" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.qrSign}</a>
                   <a href="/ops/history" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.history}</a>
-                  <a href="/ops/survey" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.survey}</a>
+                  {user.is_superuser && (
+                    <a href="/ops/survey" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.survey}</a>
+                  )}
                   <a href="/ops/account" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">{t.ops.account}</a>
                   {user.is_superuser && (
                     <a href="/ops/admin" className="px-4 py-2.5 text-sm text-ifasto-text hover:bg-ifasto-bg">Admin</a>

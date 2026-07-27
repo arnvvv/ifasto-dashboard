@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.users import current_active_user
+from app.auth.users import current_superuser
 from app.database import get_session
 from app.models.operations import WtpSurvey
 from app.models.user import User
@@ -26,7 +26,7 @@ router = APIRouter()
 @router.post("", response_model=SurveyRead, status_code=201)
 async def create_survey(
     body: SurveyCreate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(current_superuser),
     session: AsyncSession = Depends(get_session),
 ) -> WtpSurvey:
     row = WtpSurvey(**body.model_dump())
@@ -39,7 +39,7 @@ async def create_survey(
 @router.get("", response_model=list[SurveyRead])
 async def list_surveys(
     limit: int = Query(default=200, ge=1, le=1000),
-    user: User = Depends(current_active_user),
+    user: User = Depends(current_superuser),
     session: AsyncSession = Depends(get_session),
 ) -> list[WtpSurvey]:
     stmt = select(WtpSurvey).order_by(WtpSurvey.created_at.desc()).limit(limit)
@@ -48,7 +48,7 @@ async def list_surveys(
 
 @router.get("/summary")
 async def survey_summary(
-    user: User = Depends(current_active_user),
+    user: User = Depends(current_superuser),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Field demand curve from v2 rows. Yes-rate by the RANDOMIZED offered
