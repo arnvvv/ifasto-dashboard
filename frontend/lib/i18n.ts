@@ -233,6 +233,11 @@ export interface Dict {
     joinAgain: string;
     currentWaitBig: (m: number) => string;
     lineAtDoor: string;
+    seePrice: string;
+    goBack: string;
+    confirmFor: (price: string) => string;
+    lockNote: string;
+    notAvailableNow: string;
   };
   statement: {
     title: string;
@@ -484,6 +489,11 @@ export const ja: Dict = {
     joinAgain: "もう一度並ぶ",
     currentWaitBig: (m) => `現在の待ち時間 約${m}分`,
     lineAtDoor: "ご入店は店頭の列にお並びください。ファストパスなら並ばずにご案内します。",
+    seePrice: "ファストパス料金を見る",
+    goBack: "← 戻る",
+    confirmFor: (price) => `${price}で確定する`,
+    lockNote: "確定後、お席の枠を5分間確保します。5分以内に店頭でお支払いください。",
+    notAvailableNow: "ただいまファストパスはご利用いただけません。店頭の列にお並びください。",
   },
   statement: {
     title: "月次明細",
@@ -734,6 +744,11 @@ export const en: Dict = {
     joinAgain: "Join the queue again",
     currentWaitBig: (m) => `Current wait: about ${m} min`,
     lineAtDoor: "Please line up at the door to enter. Or skip the wait with a fast pass.",
+    seePrice: "See fast pass price",
+    goBack: "← Back",
+    confirmFor: (price) => `Confirm for ${price}`,
+    lockNote: "Confirming holds your spot for 5 minutes. Please pay at the counter within that time.",
+    notAvailableNow: "The fast pass is not available right now. Please line up at the door.",
   },
   statement: {
     title: "Monthly statement",
