@@ -102,8 +102,8 @@ export default function QrSignPage() {
           <p className="inline-block px-4 py-1.5 rounded-full bg-ifasto-amber text-sm font-bold tracking-widest mb-4">
             FAST PASS AVAILABLE
           </p>
-          <p className="text-2xl font-bold mb-1">スキャンして、並ばずに入店</p>
-          <p className="text-lg text-ifasto-secondary mb-6">Scan to skip the line</p>
+          <p className="text-2xl font-bold mb-1">スキャンして、優先案内</p>
+          <p className="text-lg text-ifasto-secondary mb-6">Scan for priority seating</p>
           <p className="text-sm text-ifasto-secondary mb-8">
             価格は行列の長さで変わります · Price moves with the line
           </p>
