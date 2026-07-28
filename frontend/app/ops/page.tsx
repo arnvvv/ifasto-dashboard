@@ -157,6 +157,20 @@ export default function OpsPage() {
     }
   }
 
+  async function handleConfirmPay(id: string) {
+    if (!token) return;
+    setActionId(id);
+    setActionError(null);
+    try {
+      await queueApi.confirmPayment(token, id);
+    } catch (err) {
+      setActionError(toMessage(err, t.ops.errConfirm));
+      void refresh();
+    } finally {
+      setActionId(null);
+    }
+  }
+
   async function handleWalk(id: string) {
     if (!token) return;
     setActionId(id);
@@ -471,6 +485,7 @@ export default function OpsPage() {
           actionId={actionId}
           onSeat={handleSeat}
           onWalk={handleWalk}
+          onConfirmPay={handleConfirmPay}
           loading={loading}
         />
         <QueueColumn
@@ -481,6 +496,7 @@ export default function OpsPage() {
           actionId={actionId}
           onSeat={handleSeat}
           onWalk={handleWalk}
+          onConfirmPay={handleConfirmPay}
           loading={loading}
         />
       </section>
@@ -550,6 +566,7 @@ interface QueueColumnProps {
   actionId: string | null;
   onSeat: (id: string) => void;
   onWalk: (id: string) => void;
+  onConfirmPay: (id: string) => void;
   loading: boolean;
 }
 
@@ -561,6 +578,7 @@ function QueueColumn({
   actionId,
   onSeat,
   onWalk,
+  onConfirmPay,
   loading,
 }: QueueColumnProps) {
   const { t } = useT();
@@ -590,6 +608,7 @@ function QueueColumn({
               busy={actionId === entry.id}
               onSeat={() => onSeat(entry.id)}
               onWalk={() => onWalk(entry.id)}
+              onConfirmPay={() => onConfirmPay(entry.id)}
             />
           ))
         )}
@@ -604,15 +623,18 @@ function EntryRow({
   busy,
   onSeat,
   onWalk,
+  onConfirmPay,
 }: {
   entry: QueueEntry;
   position: number;
   busy: boolean;
   onSeat: () => void;
   onWalk: () => void;
+  onConfirmPay: () => void;
 }) {
   const { t } = useT();
   const waited = waitedMinutes(entry.joined_at);
+  const pendingPay = entry.premium_pending_until != null;
   return (
     <li className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
       <span className="font-mono text-base font-bold text-ifasto-text w-12 shrink-0 tabular-nums">
@@ -631,6 +653,11 @@ function EntryRow({
           {entry.skip_price != null && (
             <> · ¥{entry.skip_price.toLocaleString()}</>
           )}
+          {pendingPay && (
+            <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium align-middle">
+              {t.ops.pendingChip}
+            </span>
+          )}
         </p>
         {entry.notes && (
           <p className="text-xs text-ifasto-secondary italic mt-0.5 truncate">
@@ -639,6 +666,15 @@ function EntryRow({
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
+        {pendingPay && (
+          <button
+            onClick={onConfirmPay}
+            disabled={busy}
+            className="px-3 py-2.5 text-xs bg-amber-400 rounded-md font-semibold disabled:opacity-40"
+          >
+            {t.ops.confirmPay}
+          </button>
+        )}
         <button
           onClick={onWalk}
           disabled={busy}

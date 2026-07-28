@@ -25,6 +25,7 @@ export interface PublicEntry {
   entry_type: "regular" | "premium";
   paid_amount: number | null;
   paid_online: boolean;
+  pending_seconds_left: number | null;
 }
 
 export class PublicApiError extends Error {

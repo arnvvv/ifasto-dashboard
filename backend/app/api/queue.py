@@ -50,10 +50,47 @@ def _today_start_utc() -> datetime:
     return jst_midnight.astimezone(timezone.utc)
 
 
+PENDING_WINDOW_MIN = 5
+
+
+async def expire_pending_premiums(session: AsyncSession, restaurant_id: uuid.UUID) -> None:
+    """Demote guest fast passes whose 5-minute confirm window lapsed back to
+    the FREE queue — ticket number and join time intact, slot released.
+    Called from compute_queue_state, the choke point every quote, join,
+    broadcast, and status poll flows through, so expiry is lazy but timely
+    (guest ticket pages poll every 10s)."""
+    now = datetime.now(timezone.utc)
+    stmt = select(QueueEntry).where(
+        QueueEntry.restaurant_id == restaurant_id,
+        QueueEntry.status == QueueEntryStatus.waiting,
+        QueueEntry.entry_type == QueueEntryType.premium,
+        QueueEntry.premium_pending_until.isnot(None),
+        QueueEntry.premium_pending_until < now,
+    )
+    expired = list((await session.execute(stmt)).scalars().all())
+    if not expired:
+        return
+    for e in expired:
+        e.entry_type = QueueEntryType.regular
+        e.skip_price = None
+        e.quoted_price = None
+        e.premium_pending_until = None
+    await session.commit()
+    for e in expired:
+        await session.refresh(e)
+        # Reverse the purchase: premium count down, back into the free queue.
+        notify_engine(restaurant_id, [
+            ("premium_release", e.party_size),
+            ("queue_join", e.party_size),
+        ])
+        await _broadcast(session, restaurant_id, "demoted", e)
+
+
 async def compute_queue_state(
     session: AsyncSession, restaurant_id: uuid.UUID
 ) -> QueueState:
     """Header snapshot — waiting counts + today's seated/revenue totals."""
+    await expire_pending_premiums(session, restaurant_id)
     waiting_stmt = select(QueueEntry).where(
         QueueEntry.restaurant_id == restaurant_id,
         QueueEntry.status == QueueEntryStatus.waiting,
@@ -338,6 +375,27 @@ async def seat_entry(
     if entry.entry_type == QueueEntryType.regular:
         notify_engine(user.restaurant_id, [("queue_leave", entry.party_size)])
     await _broadcast(session, user.restaurant_id, "seated", entry)
+    return entry
+
+
+@router.patch("/entries/{entry_id}/confirm-payment", response_model=QueueEntryRead)
+async def confirm_payment(
+    entry_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> QueueEntry:
+    """Staff confirms the guest paid (or committed to pay) at the counter —
+    locks the fast-pass slot in before the 5-minute window lapses."""
+    entry = await _get_entry_scoped(session, entry_id, user.restaurant_id)
+    if entry.entry_type != QueueEntryType.premium or entry.premium_pending_until is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Entry has no pending payment window.",
+        )
+    entry.premium_pending_until = None
+    await session.commit()
+    await session.refresh(entry)
+    await _broadcast(session, user.restaurant_id, "confirmed", entry)
     return entry
 
 

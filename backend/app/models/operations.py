@@ -99,6 +99,11 @@ class QueueEntry(Base):
     # Stripe Checkout session that paid for this entry (digital fast pass).
     # UNIQUE => a checkout session can fulfil at most one entry (idempotency).
     stripe_checkout_id: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
+    # Register-mode guest fast passes hold their slot only until this
+    # deadline (5 min): staff confirms payment/commitment at the counter or
+    # the entry auto-demotes back to the free queue, ticket intact. NULL =
+    # confirmed (staff-sold, Stripe-paid, or confirmed at the counter).
+    premium_pending_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     quoted_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     restaurant: Mapped["Restaurant"] = relationship(back_populates="queue_entries")

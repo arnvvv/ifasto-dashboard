@@ -36,6 +36,7 @@ class QueueEntryRead(BaseModel):
     status: QueueEntryStatus
     skip_price: int | None
     quoted_price: int | None = None
+    premium_pending_until: datetime | None = None
     predicted_wait_at_join: float | None = None
 
     model_config = {"from_attributes": True}

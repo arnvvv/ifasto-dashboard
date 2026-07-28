@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -96,6 +96,13 @@ def _entry_public_view(entry: QueueEntry, parties_ahead: int, venue: Restaurant)
         # True when payment already happened online (Stripe); register-mode
         # passes stay False until staff collects at seating.
         "paid_online": entry.stripe_checkout_id is not None,
+        # Seconds left in the confirm-at-counter window (register-mode guest
+        # passes); None = confirmed or not applicable.
+        "pending_seconds_left": (
+            max(0, int((entry.premium_pending_until - datetime.now(timezone.utc)).total_seconds()))
+            if entry.premium_pending_until is not None and entry.status == QueueEntryStatus.waiting
+            else None
+        ),
     }
 
 
@@ -208,7 +215,7 @@ async def entry_leave(
 
 import httpx as _httpx
 
-from app.api.queue import create_entry
+from app.api.queue import PENDING_WINDOW_MIN, create_entry
 from app.schemas.queue import QueueEntryCreate
 from app.services.engine_payload import get_venue_settings
 from app.services.caps import MIN_FASTPASS_QUEUE
@@ -347,7 +354,9 @@ async def fastpass_accept(
             )
         return {"mode": "stripe", "checkout_url": cs["url"]}
 
-    # register mode: issue the pass now; staff collects at the till.
+    # register mode: issue the pass now with a 5-minute confirm window —
+    # staff marks payment/commitment at the counter or the slot auto-demotes
+    # back to the free queue (ticket intact).
     entry = await create_entry(session, venue.id, QueueEntryCreate(
         party_size=body.party_size,
         entry_type=QueueEntryType.premium,
@@ -355,6 +364,10 @@ async def fastpass_accept(
         quoted_price=price,
         pricing_session_id=q.get("session_id"),
     ))
+    entry.premium_pending_until = datetime.now(timezone.utc) + timedelta(minutes=PENDING_WINDOW_MIN)
+    await session.commit()
+    await session.refresh(entry)
+    await _ws_broadcast(session, venue.id, "updated", entry)
     ahead = await _parties_ahead(session, entry)
     return {"mode": "register", **_entry_public_view(entry, ahead, venue)}
 
@@ -489,6 +502,11 @@ async def _convert_to_premium(session: AsyncSession, entry: QueueEntry,
             entry.pricing_session_id = session_id
         if checkout_id:
             entry.stripe_checkout_id = checkout_id
+            entry.premium_pending_until = None  # paid online = confirmed
+        else:
+            entry.premium_pending_until = (
+                datetime.now(timezone.utc) + timedelta(minutes=PENDING_WINDOW_MIN)
+            )
         await session.commit()
         await session.refresh(entry)
     # Engine sync: the party already counted as queue_join at their original

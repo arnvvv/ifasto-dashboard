@@ -93,8 +93,8 @@ export function useQueue(token: string | null): UseQueueResult {
               if (evt.event === "joined" || evt.event === "reinstated") {
                 return idx >= 0 ? prev : [...prev, entry];
               }
-              // upgraded (regular -> fast pass): still waiting, update in place
-              if (evt.event === "upgraded") {
+              // in-place updates: still waiting, row data changed
+              if (["upgraded", "demoted", "confirmed", "updated"].includes(evt.event)) {
                 return idx >= 0
                   ? prev.map((e) => (e.id === entry.id ? entry : e))
                   : prev;

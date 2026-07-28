@@ -180,6 +180,13 @@ export default function GuestTicketPage() {
             )}
           </div>
 
+          {entry.status === "waiting" && entry.entry_type === "premium" &&
+            entry.pending_seconds_left != null && (
+            <div className="mb-6 rounded-md bg-amber-100 border border-amber-300 px-4 py-3 text-sm text-amber-900">
+              {t.guest.fpPendingBanner(Math.max(1, Math.ceil(entry.pending_seconds_left / 60)))}
+            </div>
+          )}
+
           {entry.status === "waiting" && entry.entry_type === "regular" &&
             upOffer?.available && upOffer.price_minor != null && (
             <button

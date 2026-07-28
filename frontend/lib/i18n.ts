@@ -95,6 +95,9 @@ export interface Dict {
     waited: (mins: number) => string;
     seat: string;
     walk: string;
+    confirmPay: string;
+    pendingChip: string;
+    errConfirm: string;
 
     errSeat: string;
     errWalk: string;
@@ -225,6 +228,7 @@ export interface Dict {
     fpPayFailed: string;
     fpUpgradeTitle: string;
     fpUpgradeButton: (price: string) => string;
+    fpPendingBanner: (mins: number) => string;
   };
   statement: {
     title: string;
@@ -337,6 +341,9 @@ export const ja: Dict = {
     waited: (m) => `待ち ${m}分`,
     seat: "案内",
     walk: "不在",
+    confirmPay: "支払確認",
+    pendingChip: "支払未確認",
+    errConfirm: "確認に失敗しました。",
 
     errSeat: "案内の処理に失敗しました。",
     errWalk: "不在の処理に失敗しました。",
@@ -468,6 +475,7 @@ export const ja: Dict = {
     fpPayFailed: "お支払いを確認できませんでした。店頭スタッフにお声がけください。",
     fpUpgradeTitle: "並んだまま、先にご案内",
     fpUpgradeButton: (price) => `${price}でファストパスに変更`,
+    fpPendingBanner: (m) => `${m}分以内に店頭でお支払い（またはお声がけ）ください。確認できない場合は通常の列に戻ります。`,
   },
   statement: {
     title: "月次明細",
@@ -579,6 +587,9 @@ export const en: Dict = {
     waited: (m) => `waited ${m} min`,
     seat: "Seat",
     walk: "Walk",
+    confirmPay: "Confirm pay",
+    pendingChip: "Unconfirmed",
+    errConfirm: "Could not confirm.",
 
     errSeat: "Could not seat that party.",
     errWalk: "Could not mark that party as walked away.",
@@ -710,6 +721,7 @@ export const en: Dict = {
     fpPayFailed: "We could not confirm the payment. Please see the staff.",
     fpUpgradeTitle: "Skip ahead without losing your spot",
     fpUpgradeButton: (price) => `Upgrade to fast pass for ${price}`,
+    fpPendingBanner: (m) => `Please pay (or check in) at the counter within ${m} min, or you'll return to the regular queue.`,
   },
   statement: {
     title: "Monthly statement",
