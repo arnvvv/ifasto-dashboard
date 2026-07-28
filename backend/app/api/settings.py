@@ -58,6 +58,29 @@ async def update_settings(
     return vs
 
 
+from pydantic import BaseModel, Field as _Field
+
+
+class QueueCountUpdate(BaseModel):
+    manual_queue_count: int = _Field(ge=0, le=200)
+
+
+@router.patch("/queue-count", response_model=VenueSettingsRead)
+async def set_queue_count(
+    body: QueueCountUpdate,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_session),
+) -> VenueSettings:
+    """The one number floor staff maintain in fastpass-only mode: how long
+    the physical line is. Any staff role can nudge it — it's the door
+    person's job. Feeds pricing, caps, snapshots, and the guest wait."""
+    vs = await _get_or_create(session, user.restaurant_id)
+    vs.manual_queue_count = body.manual_queue_count
+    await session.commit()
+    await session.refresh(vs)
+    return vs
+
+
 def _qr_payload(venue: Restaurant) -> dict:
     return {
         "qr_token": venue.qr_token,

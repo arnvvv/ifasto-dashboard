@@ -10,6 +10,8 @@ export interface VenueSettings {
   max_party_size_eligible: number;
   large_party_cap_per_service: number;
   premium_paused: boolean;
+  fastpass_only: boolean;
+  manual_queue_count: number;
   updated_at: string | null;
 }
 
@@ -34,6 +36,10 @@ export const settingsApi = {
   get: (token: string) => api<VenueSettings>("/api/settings", { token }),
   update: (token: string, body: VenueSettingsUpdate) =>
     api<VenueSettings>("/api/settings", { method: "PATCH", body, token }),
+  setQueueCount: (token: string, n: number) =>
+    api<VenueSettings>("/api/settings/queue-count", {
+      method: "PATCH", body: { manual_queue_count: n }, token,
+    }),
   qr: (token: string) => api<QrInfo>("/api/settings/qr", { token }),
   rotateQr: (token: string) => api<QrInfo>("/api/settings/qr/rotate", { method: "POST", token }),
 };

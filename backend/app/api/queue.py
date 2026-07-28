@@ -70,20 +70,37 @@ async def expire_pending_premiums(session: AsyncSession, restaurant_id: uuid.UUI
     expired = list((await session.execute(stmt)).scalars().all())
     if not expired:
         return
+    from app.models.restaurant import VenueSettings as _VS
+    _vs = await session.get(_VS, restaurant_id)
+    fastpass_only = bool(_vs is not None and _vs.fastpass_only)
+    now_dt = datetime.now(timezone.utc)
     for e in expired:
-        e.entry_type = QueueEntryType.regular
-        e.skip_price = None
-        e.quoted_price = None
-        e.premium_pending_until = None
+        if fastpass_only:
+            # No digital free queue exists: the pass simply lapses. The guest
+            # is still standing in the physical line and can re-buy.
+            e.status = QueueEntryStatus.walked_away
+            e.walked_away_at = now_dt
+            e.premium_pending_until = None
+        else:
+            e.entry_type = QueueEntryType.regular
+            e.skip_price = None
+            e.quoted_price = None
+            e.premium_pending_until = None
     await session.commit()
     for e in expired:
         await session.refresh(e)
-        # Reverse the purchase: premium count down, back into the free queue.
-        notify_engine(restaurant_id, [
-            ("premium_release", e.party_size),
-            ("queue_join", e.party_size),
-        ])
-        await _broadcast(session, restaurant_id, "demoted", e)
+        if fastpass_only:
+            # Reverse only the premium count; the physical line (manual
+            # number) never changed.
+            notify_engine(restaurant_id, [("premium_release", e.party_size)])
+            await _broadcast(session, restaurant_id, "walked_away", e)
+        else:
+            # Reverse the purchase: premium down, back into the free queue.
+            notify_engine(restaurant_id, [
+                ("premium_release", e.party_size),
+                ("queue_join", e.party_size),
+            ])
+            await _broadcast(session, restaurant_id, "demoted", e)
 
 
 async def compute_queue_state(
@@ -133,6 +150,14 @@ async def compute_queue_state(
     median_wait_today = (
         round(durations[len(durations) // 2], 1) if durations else None
     )
+
+    # Fastpass-only venues don't track free-line parties as entries: the
+    # staff-maintained manual count IS the regular queue for pricing, caps,
+    # snapshots, and the guest-facing wait.
+    from app.models.restaurant import VenueSettings as _VS
+    _vs = await session.get(_VS, restaurant_id)
+    if _vs is not None and _vs.fastpass_only:
+        regular = max(int(_vs.manual_queue_count or 0), 0)
 
     return QueueState(
         regular_waiting=regular,

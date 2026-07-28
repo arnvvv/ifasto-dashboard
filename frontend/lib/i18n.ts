@@ -98,6 +98,7 @@ export interface Dict {
     confirmPay: string;
     pendingChip: string;
     errConfirm: string;
+    lineLength: string;
 
     errSeat: string;
     errWalk: string;
@@ -347,6 +348,7 @@ export const ja: Dict = {
     confirmPay: "支払確認",
     pendingChip: "支払未確認",
     errConfirm: "確認に失敗しました。",
+    lineLength: "店頭の行列（組数）",
 
     errSeat: "案内の処理に失敗しました。",
     errWalk: "不在の処理に失敗しました。",
@@ -596,6 +598,7 @@ export const en: Dict = {
     confirmPay: "Confirm pay",
     pendingChip: "Unconfirmed",
     errConfirm: "Could not confirm.",
+    lineLength: "Line at the door (parties)",
 
     errSeat: "Could not seat that party.",
     errWalk: "Could not mark that party as walked away.",

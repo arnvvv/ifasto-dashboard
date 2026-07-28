@@ -17,6 +17,8 @@ class VenueSettingsRead(BaseModel):
     max_party_size_eligible: int
     large_party_cap_per_service: int
     premium_paused: bool
+    fastpass_only: bool
+    manual_queue_count: int
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

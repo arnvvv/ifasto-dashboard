@@ -114,6 +114,7 @@ export default function OpsPage() {
   const [showCaps, setShowCaps] = useState(false);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const canEditSettings = user?.role === "owner" || user?.role === "manager";
+  const fastpassOnly = settings?.fastpass_only ?? false;
 
   useEffect(() => {
     if (!token) return;
@@ -154,6 +155,18 @@ export default function OpsPage() {
       void refresh();
     } finally {
       setActionId(null);
+    }
+  }
+
+  async function bumpQueueCount(delta: number) {
+    if (!token || !settings) return;
+    const next = Math.max(0, (settings.manual_queue_count ?? 0) + delta);
+    setSettings({ ...settings, manual_queue_count: next });
+    try {
+      const saved = await settingsApi.setQueueCount(token, next);
+      setSettings(saved);
+    } catch {
+      void settingsApi.get(token).then(setSettings).catch(() => {});
     }
   }
 
@@ -403,6 +416,32 @@ export default function OpsPage() {
         )}
       </section>
 
+      {fastpassOnly && settings && (
+        <section className="px-4 sm:px-6 py-3 border-b border-ifasto-border flex items-center gap-3">
+          <span className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary shrink-0">
+            {t.ops.lineLength}
+          </span>
+          <div className="flex items-center gap-3 border border-ifasto-border rounded-lg bg-white px-2 py-1">
+            <button
+              onClick={() => void bumpQueueCount(-1)}
+              className="w-11 h-11 rounded-md text-2xl text-ifasto-text active:bg-ifasto-bg"
+            >
+              –
+            </button>
+            <span className="text-2xl font-semibold tabular-nums w-10 text-center">
+              {settings.manual_queue_count}
+            </span>
+            <button
+              onClick={() => void bumpQueueCount(1)}
+              className="w-11 h-11 rounded-md text-2xl text-ifasto-text active:bg-ifasto-bg"
+            >
+              +
+            </button>
+          </div>
+        </section>
+      )}
+
+      {!fastpassOnly && (
       <section className="px-4 sm:px-6 py-3 border-b border-ifasto-border flex items-center gap-2 sm:gap-3">
         <span className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary shrink-0">
           {t.ops.quickAdd}
@@ -424,6 +463,7 @@ export default function OpsPage() {
           {t.ops.quickAddDetail}
         </button>
       </section>
+      )}
 
       <section className="px-4 sm:px-6 py-4 border-b border-ifasto-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
@@ -476,7 +516,9 @@ export default function OpsPage() {
         </div>
       )}
 
-      <section className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-ifasto-border">
+      <section className={fastpassOnly
+        ? "flex-1 grid grid-cols-1"
+        : "flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-ifasto-border"}>
         <QueueColumn
           title={t.ops.colPremium}
           tone="amber"
@@ -488,6 +530,7 @@ export default function OpsPage() {
           onConfirmPay={handleConfirmPay}
           loading={loading}
         />
+        {!fastpassOnly && (
         <QueueColumn
           title={t.ops.colRegular}
           tone="text"
@@ -499,6 +542,7 @@ export default function OpsPage() {
           onConfirmPay={handleConfirmPay}
           loading={loading}
         />
+        )}
       </section>
 
       {undoState && (

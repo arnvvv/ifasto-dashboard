@@ -117,6 +117,12 @@ class VenueSettings(Base):
     # free queue; the QR shows the wait and sells the skip. Venues that want
     # remote free-join (e.g. malls with seating areas) flip this on.
     guest_free_join_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # THE product mode (founder decision 2026-07-28): ifasto sells the fast
+    # pass ONLY. The venue's free line stays physical and un-digitized; staff
+    # keep a one-number estimate of its length (manual_queue_count) that
+    # feeds pricing, caps, and training snapshots.
+    fastpass_only: Mapped[bool] = mapped_column(Boolean, default=True)
+    manual_queue_count: Mapped[int] = mapped_column(Integer, default=0)
     payment_mode: Mapped[str] = mapped_column(String(10), default="register")
     stripe_secret_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Per-venue pricing-curve overrides, forwarded verbatim to the engine's
