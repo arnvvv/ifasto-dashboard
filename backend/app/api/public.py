@@ -397,6 +397,22 @@ async def fastpass_complete(
         raise HTTPException(status_code=409, detail="Session does not match venue.")
 
     price = int(meta.get("price_minor") or cs.get("amount_total") or 0)
+
+    # Upgrade fulfilment: convert the guest's EXISTING entry (keeps ticket).
+    up_id = meta.get("upgrade_entry_id")
+    if up_id:
+        entry = await session.get(QueueEntry, uuid.UUID(up_id))
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Entry not found.")
+        if entry.entry_type != QueueEntryType.premium:
+            # Paid: honor past the cap, same policy as new-pass fulfilment.
+            entry = await _convert_to_premium(
+                session, entry, price, None,
+                checkout_id=body.checkout_session_id, enforce_cap=False,
+            )
+        ahead = await _parties_ahead(session, entry) if entry.status == QueueEntryStatus.waiting else 0
+        return _entry_public_view(entry, ahead, venue)
+
     party = int(meta.get("party_size") or 2)
 
     # The guest PAID: honor the pass even if the cap filled while they were
@@ -416,3 +432,144 @@ async def fastpass_complete(
     await session.refresh(entry)
     ahead = await _parties_ahead(session, entry)
     return _entry_public_view(entry, ahead, venue)
+
+
+# ---------------------------------------------------------------------------
+# In-queue upgrade: a guest already waiting in the FREE line converts their
+# existing entry to a fast pass — keeping their ticket number and join time.
+# The most motivated buyer is someone mid-wait; this is their path.
+# ---------------------------------------------------------------------------
+
+from app.api.queue import _broadcast as _ws_broadcast
+from app.api.queue import _premium_lock, compute_queue_state as _cqs
+from app.services.caps import allowed_passes as _allowed
+
+
+async def _upgradable(session: AsyncSession, entry_id: uuid.UUID):
+    """Entry + venue + settings, or an HTTP error if not upgradable."""
+    entry = await session.get(QueueEntry, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Not found.")
+    venue = await session.get(Restaurant, entry.restaurant_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Not found.")
+    vs = await get_venue_settings(session, entry.restaurant_id)
+    if not vs.fastpass_guest_enabled:
+        raise HTTPException(status_code=404, detail="Not available.")
+    if entry.status != QueueEntryStatus.waiting:
+        raise HTTPException(status_code=409, detail={"reason": "not_waiting",
+                                                     "message": "No longer waiting."})
+    if entry.entry_type == QueueEntryType.premium:
+        raise HTTPException(status_code=409, detail={"reason": "already_premium",
+                                                     "message": "Already a fast pass."})
+    return entry, venue, vs
+
+
+async def _convert_to_premium(session: AsyncSession, entry: QueueEntry,
+                              price: int, session_id: str | None,
+                              checkout_id: str | None = None,
+                              enforce_cap: bool = True) -> QueueEntry:
+    """Atomically flip a waiting regular entry to premium under the same
+    per-venue lock the creation path uses. Ticket number and joined_at are
+    preserved — the guest keeps their identity and history."""
+    async with _premium_lock(entry.restaurant_id):
+        if enforce_cap:
+            cur = await _cqs(session, entry.restaurant_id)
+            cap = _allowed(cur.total_waiting)
+            if cur.premium_waiting >= cap:
+                raise HTTPException(status_code=409, detail={
+                    "reason": "pass_cap_reached",
+                    "message": (f"Fast-pass limit reached: {cur.premium_waiting}/{cap} "
+                                f"for a queue of {cur.total_waiting}."),
+                })
+        entry.entry_type = QueueEntryType.premium
+        entry.skip_price = price
+        entry.quoted_price = price
+        if session_id:
+            entry.pricing_session_id = session_id
+        if checkout_id:
+            entry.stripe_checkout_id = checkout_id
+        await session.commit()
+        await session.refresh(entry)
+    # Engine sync: the party already counted as queue_join at their original
+    # join; a purchase decrements queue and increments premium.
+    notify_engine(entry.restaurant_id, [("premium_purchase", entry.party_size)])
+    await _ws_broadcast(session, entry.restaurant_id, "upgraded", entry)
+    return entry
+
+
+@router.get("/entry/{entry_id}/upgrade-offer")
+async def upgrade_offer(
+    entry_id: uuid.UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    try:
+        entry, venue, vs = await _upgradable(session, entry_id)
+    except HTTPException as exc:
+        if exc.status_code == 409:
+            return {"available": False, "reason": exc.detail.get("reason")}
+        raise
+    if not _quote_rate_ok(_client_ip(request)):
+        raise HTTPException(status_code=429, detail="Too many requests.")
+    try:
+        q = await get_quote(session, venue.id, entry.party_size, source="guest_upgrade_offer")
+    except QuoteRefused as exc:
+        return {"available": False, "reason": exc.reason}
+    return {
+        "available": True,
+        "payment_mode": vs.payment_mode,
+        "price_minor": q["price_minor"],
+        "currency": q.get("currency", "JPY"),
+    }
+
+
+@router.post("/entry/{entry_id}/upgrade")
+async def upgrade_entry(
+    entry_id: uuid.UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    entry, venue, vs = await _upgradable(session, entry_id)
+    if not _quote_rate_ok(_client_ip(request)):
+        raise HTTPException(status_code=429, detail="Too many requests.")
+
+    try:
+        q = await get_quote(session, venue.id, entry.party_size, source="guest_upgrade")
+    except QuoteRefused as exc:
+        raise HTTPException(status_code=409, detail={"reason": exc.reason, "message": exc.message})
+    price = int(q["price_minor"])
+
+    if vs.payment_mode == "stripe" and vs.stripe_secret_key:
+        success = (
+            "https://app.ifasto.com/g/pay/complete"
+            f"?token={venue.qr_token}&cs={{CHECKOUT_SESSION_ID}}"
+        )
+        form = {
+            "mode": "payment",
+            "success_url": success,
+            "cancel_url": f"https://app.ifasto.com/g/{entry.id}",
+            "line_items[0][price_data][currency]": "jpy",
+            "line_items[0][price_data][unit_amount]": str(price),
+            "line_items[0][price_data][product_data][name]": f"Fast pass — {venue.name}",
+            "line_items[0][quantity]": "1",
+            "metadata[qr_token]": venue.qr_token or "",
+            "metadata[upgrade_entry_id]": str(entry.id),
+            "metadata[price_minor]": str(price),
+            "expires_at": str(int(time.time()) + 35 * 60),
+        }
+        try:
+            async with _httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(f"{STRIPE_API}/checkout/sessions",
+                                         data=form, auth=(vs.stripe_secret_key, ""))
+                resp.raise_for_status()
+                cs = resp.json()
+        except _httpx.HTTPError:
+            raise HTTPException(status_code=503, detail={
+                "reason": "payment_unavailable",
+                "message": "Payment provider did not respond."})
+        return {"mode": "stripe", "checkout_url": cs["url"]}
+
+    entry = await _convert_to_premium(session, entry, price, q.get("session_id"))
+    ahead = await _parties_ahead(session, entry)
+    return {"mode": "register", **_entry_public_view(entry, ahead, venue)}

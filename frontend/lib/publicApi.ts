@@ -147,3 +147,18 @@ export function completeFastpass(token: string, checkoutSessionId: string): Prom
     body: JSON.stringify({ qr_token: token, checkout_session_id: checkoutSessionId }),
   });
 }
+
+export interface UpgradeOffer {
+  available: boolean;
+  reason?: string;
+  payment_mode?: "register" | "stripe";
+  price_minor?: number;
+}
+
+export function getUpgradeOffer(entryId: string): Promise<UpgradeOffer> {
+  return req(`/api/public/entry/${encodeURIComponent(entryId)}/upgrade-offer`);
+}
+
+export function upgradeEntry(entryId: string): Promise<FastpassAcceptResult> {
+  return req(`/api/public/entry/${encodeURIComponent(entryId)}/upgrade`, { method: "POST" });
+}

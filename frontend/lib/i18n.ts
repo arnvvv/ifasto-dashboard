@@ -223,6 +223,8 @@ export interface Dict {
     fpAccepting: string;
     fpCompleting: string;
     fpPayFailed: string;
+    fpUpgradeTitle: string;
+    fpUpgradeButton: (price: string) => string;
   };
   statement: {
     title: string;
@@ -464,6 +466,8 @@ export const ja: Dict = {
     fpAccepting: "手続き中…",
     fpCompleting: "お支払いを確認しています…",
     fpPayFailed: "お支払いを確認できませんでした。店頭スタッフにお声がけください。",
+    fpUpgradeTitle: "並んだまま、先にご案内",
+    fpUpgradeButton: (price) => `${price}でファストパスに変更`,
   },
   statement: {
     title: "月次明細",
@@ -704,6 +708,8 @@ export const en: Dict = {
     fpAccepting: "Processing…",
     fpCompleting: "Confirming your payment…",
     fpPayFailed: "We could not confirm the payment. Please see the staff.",
+    fpUpgradeTitle: "Skip ahead without losing your spot",
+    fpUpgradeButton: (price) => `Upgrade to fast pass for ${price}`,
   },
   statement: {
     title: "Monthly statement",

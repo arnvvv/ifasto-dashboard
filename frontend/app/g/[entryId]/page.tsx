@@ -8,9 +8,12 @@ import { useParams } from "next/navigation";
 import {
   clearTicket,
   getEntry,
+  getUpgradeOffer,
   leaveQueue,
+  upgradeEntry,
   PublicApiError,
   type PublicEntry,
+  type UpgradeOffer,
 } from "@/lib/publicApi";
 import { useGuestLocale } from "@/lib/useGuestLocale";
 
@@ -24,6 +27,8 @@ export default function GuestTicketPage() {
   const [notFound, setNotFound] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [upOffer, setUpOffer] = useState<UpgradeOffer | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(() => {
@@ -44,6 +49,42 @@ export default function GuestTicketPage() {
         // network blips: keep the last known state, next poll retries
       });
   }, [entryId]);
+
+  // Upgrade offer for free-lane guests: fetch on load, refresh every 30s
+  // (the price moves with the queue).
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      getUpgradeOffer(entryId)
+        .then((o) => {
+          if (alive) setUpOffer(o);
+        })
+        .catch(() => {});
+    load();
+    const id = setInterval(load, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [entryId]);
+
+  async function handleUpgrade() {
+    if (upgrading) return;
+    setUpgrading(true);
+    try {
+      const res = await upgradeEntry(entryId);
+      if (res.mode === "stripe") {
+        window.location.href = res.checkout_url;
+        return;
+      }
+      setEntry(res);
+      setUpOffer(null);
+    } catch {
+      getUpgradeOffer(entryId).then(setUpOffer).catch(() => {});
+    } finally {
+      setUpgrading(false);
+    }
+  }
 
   useEffect(() => {
     refresh();
@@ -138,6 +179,24 @@ export default function GuestTicketPage() {
               </>
             )}
           </div>
+
+          {entry.status === "waiting" && entry.entry_type === "regular" &&
+            upOffer?.available && upOffer.price_minor != null && (
+            <button
+              onClick={handleUpgrade}
+              disabled={upgrading}
+              className="w-full mb-6 py-4 rounded-md border-2 border-ifasto-text bg-white text-left px-4 disabled:opacity-50"
+            >
+              <span className="block text-[11px] uppercase tracking-widest text-ifasto-secondary mb-1">
+                {t.guest.fpUpgradeTitle}
+              </span>
+              <span className="block text-lg font-semibold">
+                {upgrading
+                  ? t.guest.fpAccepting
+                  : t.guest.fpUpgradeButton(`¥${upOffer.price_minor.toLocaleString()}`)}
+              </span>
+            </button>
+          )}
 
           {entry.status === "waiting" && (
             <>
