@@ -9,6 +9,7 @@ export interface PublicVenue {
   logo_url: string | null;
   waiting: number;
   accepting: boolean;
+  free_join_enabled: boolean;
 }
 
 export interface PublicEntry {
@@ -22,6 +23,7 @@ export interface PublicEntry {
   est_remaining_p90: number | null;
   venue_name: string;
   venue_name_ja: string | null;
+  venue_token: string | null;
   entry_type: "regular" | "premium";
   paid_amount: number | null;
   paid_online: boolean;

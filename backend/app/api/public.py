@@ -89,6 +89,9 @@ def _entry_public_view(entry: QueueEntry, parties_ahead: int, venue: Restaurant)
         "est_remaining_p90": remaining_p90,
         "venue_name": venue.name,
         "venue_name_ja": venue.name_ja,
+        # Lets terminal states link back to the join page ("join again") —
+        # the guest already had this token; the entry UUID stays the capability.
+        "venue_token": venue.qr_token,
         # Receipt fields: staff-sold fast passes surface as purchase proof on
         # the guest ticket page (Model B — the restaurant collected the money).
         "entry_type": entry.entry_type.value,
@@ -113,12 +116,16 @@ async def venue_info(
 ) -> dict:
     venue = await _venue_by_token(session, qr_token)
     state = await compute_queue_state(session, venue.id)
+    vs = await get_venue_settings(session, venue.id)
     return {
         "venue_name": venue.name,
         "venue_name_ja": venue.name_ja,
         "logo_url": venue.logo_url,
         "waiting": state.total_waiting,
         "accepting": state.total_waiting < PUBLIC_JOIN_QUEUE_CAP,
+        # False => the QR page is skip-only: the physical line is the free
+        # queue, so no digital free-join button renders (or is accepted).
+        "free_join_enabled": vs.guest_free_join_enabled,
     }
 
 
@@ -130,6 +137,9 @@ async def public_join(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     venue = await _venue_by_token(session, qr_token)
+    vs_join = await get_venue_settings(session, venue.id)
+    if not vs_join.guest_free_join_enabled:
+        raise HTTPException(status_code=409, detail="This venue takes the line at the door.")
 
     ip = _client_ip(request)
     now = time.monotonic()

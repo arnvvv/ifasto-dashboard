@@ -255,6 +255,14 @@ export default function GuestTicketPage() {
             <div className="text-center">
               <p className="text-lg text-ifasto-text mb-2">{t.guest.statusWalked}</p>
               <p className="text-ifasto-secondary">{t.guest.statusWalkedBody}</p>
+              {entry.venue_token && (
+                <a
+                  href={`/q/${entry.venue_token}`}
+                  className="inline-block mt-6 w-full py-4 rounded-md text-base font-medium bg-ifasto-text text-ifasto-bg"
+                >
+                  {t.guest.joinAgain}
+                </a>
+              )}
             </div>
           )}
         </div>

@@ -153,7 +153,16 @@ export default function GuestJoinPage() {
             <img src={venue.logo_url} alt="" className="h-14 w-14 object-contain mb-3" />
           )}
           <h1 className="font-display text-3xl tracking-tight mb-1" translate="no">{venueName}</h1>
-          <p className="text-ifasto-secondary mb-8">{t.guest.waitingNow(venue.waiting)}</p>
+          <p className="text-ifasto-secondary mb-2">{t.guest.waitingNow(venue.waiting)}</p>
+          {offer?.enabled && offer.available && offer.predicted_wait_mins != null && (
+            <p className="text-2xl font-semibold text-ifasto-text mb-2">
+              {t.guest.currentWaitBig(Math.max(1, Math.round(offer.predicted_wait_mins)))}
+            </p>
+          )}
+          {!venue.free_join_enabled && (
+            <p className="text-sm text-ifasto-secondary mb-6">{t.guest.lineAtDoor}</p>
+          )}
+          <div className="mb-2" />
 
           <h2 className="text-base font-medium mb-3">{t.guest.partySize}</h2>
           <div className="grid grid-cols-4 gap-2 mb-8">
@@ -182,13 +191,15 @@ export default function GuestJoinPage() {
             </p>
           )}
 
-          <button
-            onClick={handleJoin}
-            disabled={joining || !venue.accepting}
-            className="w-full py-4 rounded-md text-lg font-medium bg-ifasto-amber text-ifasto-text disabled:opacity-50"
-          >
-            {joining ? t.guest.joining : t.guest.join}
-          </button>
+          {venue.free_join_enabled && (
+            <button
+              onClick={handleJoin}
+              disabled={joining || !venue.accepting}
+              className="w-full py-4 rounded-md text-lg font-medium bg-ifasto-amber text-ifasto-text disabled:opacity-50"
+            >
+              {joining ? t.guest.joining : t.guest.join}
+            </button>
+          )}
           {!venue.accepting && !errorText && (
             <p className="text-sm text-ifasto-secondary mt-3 text-center">{t.guest.queueFull}</p>
           )}
@@ -197,7 +208,11 @@ export default function GuestJoinPage() {
             <button
               onClick={handleFastpass}
               disabled={accepting}
-              className="w-full mt-3 py-4 rounded-md border-2 border-ifasto-text bg-white text-left px-4 disabled:opacity-50"
+              className={
+                venue.free_join_enabled
+                  ? "w-full mt-3 py-4 rounded-md border-2 border-ifasto-text bg-white text-left px-4 disabled:opacity-50"
+                  : "w-full mt-3 py-4 rounded-md bg-ifasto-amber text-left px-4 disabled:opacity-50"
+              }
             >
               <span className="block text-[11px] uppercase tracking-widest text-ifasto-secondary mb-1">
                 {t.guest.fastPass}

@@ -203,6 +203,7 @@ async def configure_fastpass(
     enable: bool | None,
     mode: str | None,
     stripe_key: str | None,
+    free_join: bool | None = None,
 ) -> None:
     async with SessionLocal() as session:
         venue = (await session.execute(
@@ -220,9 +221,12 @@ async def configure_fastpass(
             vs.payment_mode = mode
         if stripe_key is not None:
             vs.stripe_secret_key = stripe_key or None
+        if free_join is not None:
+            vs.guest_free_join_enabled = free_join
         await session.commit()
         print(f"{restaurant_name}: guest_fastpass={vs.fastpass_guest_enabled} "
-              f"mode={vs.payment_mode} stripe_key={'set' if vs.stripe_secret_key else 'none'}")
+              f"mode={vs.payment_mode} stripe_key={'set' if vs.stripe_secret_key else 'none'} "
+              f"free_join={vs.guest_free_join_enabled}")
 
 
 async def set_superuser(email: str, enabled: bool) -> None:
@@ -435,6 +439,8 @@ def main() -> None:
     fp.add_argument("--disable", dest="enable", action="store_false")
     fp.add_argument("--mode", choices=["register", "stripe"], default=None)
     fp.add_argument("--stripe-key", default=None, help="Venue's restricted key (rk_...); empty string clears")
+    fp.add_argument("--free-join", dest="free_join", action="store_true", default=None)
+    fp.add_argument("--no-free-join", dest="free_join", action="store_false")
 
     sl = sub.add_parser("set-venue-logo", help="Set or clear a venue's logo_url")
     sl.add_argument("--restaurant-name", required=True)
@@ -458,7 +464,7 @@ def main() -> None:
         return
 
     if args.cmd == "configure-fastpass":
-        asyncio.run(configure_fastpass(args.restaurant_name, args.enable, args.mode, args.stripe_key))
+        asyncio.run(configure_fastpass(args.restaurant_name, args.enable, args.mode, args.stripe_key, args.free_join))
         return
 
     if args.cmd == "set-venue-logo":

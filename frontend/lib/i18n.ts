@@ -229,6 +229,9 @@ export interface Dict {
     fpUpgradeTitle: string;
     fpUpgradeButton: (price: string) => string;
     fpPendingBanner: (mins: number) => string;
+    joinAgain: string;
+    currentWaitBig: (m: number) => string;
+    lineAtDoor: string;
   };
   statement: {
     title: string;
@@ -476,6 +479,9 @@ export const ja: Dict = {
     fpUpgradeTitle: "並んだまま、先にご案内",
     fpUpgradeButton: (price) => `${price}でファストパスに変更`,
     fpPendingBanner: (m) => `${m}分以内に店頭でお支払い（またはお声がけ）ください。確認できない場合は通常の列に戻ります。`,
+    joinAgain: "もう一度並ぶ",
+    currentWaitBig: (m) => `現在の待ち時間 約${m}分`,
+    lineAtDoor: "ご入店は店頭の列にお並びください。ファストパスなら並ばずにご案内します。",
   },
   statement: {
     title: "月次明細",
@@ -722,6 +728,9 @@ export const en: Dict = {
     fpUpgradeTitle: "Skip ahead without losing your spot",
     fpUpgradeButton: (price) => `Upgrade to fast pass for ${price}`,
     fpPendingBanner: (m) => `Please pay (or check in) at the counter within ${m} min, or you'll return to the regular queue.`,
+    joinAgain: "Join the queue again",
+    currentWaitBig: (m) => `Current wait: about ${m} min`,
+    lineAtDoor: "Please line up at the door to enter. Or skip the wait with a fast pass.",
   },
   statement: {
     title: "Monthly statement",

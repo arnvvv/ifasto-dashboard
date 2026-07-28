@@ -112,6 +112,11 @@ class VenueSettings(Base):
     # stripe_secret_key: the VENUE'S OWN restricted key (rk_...), set via CLI
     # only — never exposed through any API schema. ifasto holds no funds.
     fastpass_guest_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Whether guests can JOIN the free queue digitally from the QR page.
+    # Default FALSE (founder decision 2026-07-28): the physical line is the
+    # free queue; the QR shows the wait and sells the skip. Venues that want
+    # remote free-join (e.g. malls with seating areas) flip this on.
+    guest_free_join_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     payment_mode: Mapped[str] = mapped_column(String(10), default="register")
     stripe_secret_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Per-venue pricing-curve overrides, forwarded verbatim to the engine's
