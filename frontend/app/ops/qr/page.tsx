@@ -99,13 +99,13 @@ export default function QrSignPage() {
             <QRCodeSVG value={qr.guest_url} size={280} marginSize={2} />
           </div>
 
-          <p className="text-2xl font-medium mb-1">スキャンして順番待ちに参加</p>
-          <p className="text-lg text-ifasto-secondary mb-6">Scan to join the queue</p>
-          <p className="text-base text-ifasto-secondary mb-1">
-            お並びの前に、スマートフォンで受付できます
+          <p className="inline-block px-4 py-1.5 rounded-full bg-ifasto-amber text-sm font-bold tracking-widest mb-4">
+            FAST PASS AVAILABLE
           </p>
+          <p className="text-2xl font-bold mb-1">スキャンして、並ばずに入店</p>
+          <p className="text-lg text-ifasto-secondary mb-6">Scan to skip the line</p>
           <p className="text-sm text-ifasto-secondary mb-8">
-            Join from your phone before lining up
+            価格は行列の長さで変わります · Price moves with the line
           </p>
 
           <p className="font-mono text-xs text-ifasto-secondary break-all">
