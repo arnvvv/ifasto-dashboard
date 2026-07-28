@@ -108,10 +108,7 @@ export default function QrSignPage() {
             価格は行列の長さで変わります · Price moves with the line
           </p>
 
-          <p className="font-mono text-xs text-ifasto-secondary break-all">
-            {t.qrSign.urlLabel}: {qr.guest_url}
-          </p>
-          <p className="font-display text-lg tracking-tight mt-6" translate="no">ifasto</p>
+          <p className="font-display text-lg tracking-tight mt-2" translate="no">ifasto</p>
         </div>
       )}
     </main>
