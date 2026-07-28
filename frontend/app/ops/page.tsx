@@ -384,8 +384,21 @@ export default function OpsPage() {
         />
       )}
 
-      {/* Floor-priority metrics. Mobile shows the four that drive decisions
-          as a clean 2x2; the rest reveal on larger screens. */}
+      {fastpassOnly && (
+        <section className="px-4 sm:px-6 py-3.5 border-b border-ifasto-border grid grid-cols-2 gap-3">
+          <Stat
+            label={t.ops.tilePremium}
+            value={`${state?.premium_waiting ?? premium.length}/${allowedPasses(state?.total_waiting ?? 0)}`}
+          />
+          <Stat
+            label={t.ops.tilePremiumToday}
+            value={formatYen(state?.premium_revenue_today ?? 0)}
+            accent
+          />
+        </section>
+      )}
+
+      {!fastpassOnly && (
       <section className="px-4 sm:px-6 py-3.5 sm:py-5 border-b border-ifasto-border grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-x-3 gap-y-3 sm:gap-4">
         <Stat label={t.ops.tileWaiting} value={state?.total_waiting ?? entries.length} />
         <Stat label={t.ops.tilePremium} value={state?.premium_waiting ?? premium.length} />
@@ -415,29 +428,38 @@ export default function OpsPage() {
           </div>
         )}
       </section>
+      )}
 
       {fastpassOnly && settings && (
-        <section className="px-4 sm:px-6 py-3 border-b border-ifasto-border flex items-center gap-3">
-          <span className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary shrink-0">
-            {t.ops.lineLength}
-          </span>
-          <div className="flex items-center gap-3 border border-ifasto-border rounded-lg bg-white px-2 py-1">
-            <button
-              onClick={() => void bumpQueueCount(-1)}
-              className="w-11 h-11 rounded-md text-2xl text-ifasto-text active:bg-ifasto-bg"
-            >
-              –
-            </button>
-            <span className="text-2xl font-semibold tabular-nums w-10 text-center">
-              {settings.manual_queue_count}
-            </span>
-            <button
-              onClick={() => void bumpQueueCount(1)}
-              className="w-11 h-11 rounded-md text-2xl text-ifasto-text active:bg-ifasto-bg"
-            >
-              +
-            </button>
+        <section className="px-4 sm:px-6 py-4 border-b border-ifasto-border flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary mb-1.5">
+              {t.ops.lineLength}
+            </p>
+            <div className="flex items-center gap-4 border border-ifasto-border rounded-xl bg-white px-3 py-1.5 w-fit">
+              <button
+                onClick={() => void bumpQueueCount(-1)}
+                className="w-14 h-14 rounded-lg text-3xl text-ifasto-text active:bg-ifasto-bg"
+              >
+                –
+              </button>
+              <span className="text-4xl font-semibold tabular-nums w-14 text-center">
+                {settings.manual_queue_count}
+              </span>
+              <button
+                onClick={() => void bumpQueueCount(1)}
+                className="w-14 h-14 rounded-lg text-3xl text-ifasto-text active:bg-ifasto-bg"
+              >
+                +
+              </button>
+            </div>
           </div>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="shrink-0 px-4 py-3 text-sm border border-ifasto-border rounded-md hover:border-ifasto-text transition-colors"
+          >
+            {t.ops.addParty}
+          </button>
         </section>
       )}
 
@@ -465,6 +487,7 @@ export default function OpsPage() {
       </section>
       )}
 
+      {!fastpassOnly && (
       <section className="px-4 sm:px-6 py-4 border-b border-ifasto-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary">
@@ -509,6 +532,7 @@ export default function OpsPage() {
           </button>
         </div>
       </section>
+      )}
 
       {(error || actionError) && (
         <div className="px-6 py-3 bg-red-50 border-b border-red-100 text-sm text-red-700">
@@ -560,6 +584,7 @@ export default function OpsPage() {
       {showAdd && token && (
         <AddPartyModal
           token={token}
+          forcePremium={fastpassOnly}
           onClose={() => setShowAdd(false)}
           onAdded={() => {
             setShowAdd(false);
@@ -596,6 +621,12 @@ function Stat({
       </p>
     </div>
   );
+}
+
+// Mirror of backend caps.allowed_passes — how many passes the current line allows.
+function allowedPasses(queueLen: number): number {
+  if (queueLen < 10) return 1;
+  return 2 + Math.floor((queueLen - 10) / 5);
 }
 
 function formatYen(yen: number): string {
@@ -740,16 +771,20 @@ function EntryRow({
 
 function AddPartyModal({
   token,
+  forcePremium = false,
   onClose,
   onAdded,
 }: {
   token: string;
+  forcePremium?: boolean;
   onClose: () => void;
   onAdded: () => void;
 }) {
   const { t } = useT();
   const [partySize, setPartySize] = useState(2);
-  const [entryType, setEntryType] = useState<"regular" | "premium">("regular");
+  const [entryType, setEntryType] = useState<"regular" | "premium">(
+    forcePremium ? "premium" : "regular"
+  );
   const [partyName, setPartyName] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
@@ -854,6 +889,7 @@ function AddPartyModal({
               className="w-full px-3 py-2 bg-white border border-ifasto-border rounded-md text-base focus:outline-none focus:border-ifasto-text"
             />
           </Field>
+          {!forcePremium && (
           <Field label={t.modal.type}>
             <select
               value={entryType}
@@ -866,6 +902,7 @@ function AddPartyModal({
               <option value="premium">{t.modal.typePremium}</option>
             </select>
           </Field>
+          )}
         </div>
 
         <Field label={t.modal.name}>
