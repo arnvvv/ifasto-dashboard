@@ -384,20 +384,6 @@ export default function OpsPage() {
         />
       )}
 
-      {fastpassOnly && (
-        <section className="px-4 sm:px-6 py-3.5 border-b border-ifasto-border grid grid-cols-2 gap-3">
-          <Stat
-            label={t.ops.tilePremium}
-            value={`${state?.premium_waiting ?? premium.length}/${allowedPasses(state?.total_waiting ?? 0)}`}
-          />
-          <Stat
-            label={t.ops.tilePremiumToday}
-            value={formatYen(state?.premium_revenue_today ?? 0)}
-            accent
-          />
-        </section>
-      )}
-
       {!fastpassOnly && (
       <section className="px-4 sm:px-6 py-3.5 sm:py-5 border-b border-ifasto-border grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-x-3 gap-y-3 sm:gap-4">
         <Stat label={t.ops.tileWaiting} value={state?.total_waiting ?? entries.length} />
@@ -431,35 +417,57 @@ export default function OpsPage() {
       )}
 
       {fastpassOnly && settings && (
-        <section className="px-4 sm:px-6 py-4 border-b border-ifasto-border flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-mono uppercase tracking-widest text-ifasto-secondary mb-1.5">
+        <section className="px-4 sm:px-6 py-4 border-b border-ifasto-border grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Card 1: the line — the door person's single number */}
+          <div className="bg-white border border-ifasto-border rounded-xl px-4 py-4 flex flex-col items-center justify-center">
+            <p className="text-[11px] font-mono uppercase tracking-widest text-ifasto-secondary mb-2">
               {t.ops.lineLength}
             </p>
-            <div className="flex items-center gap-4 border border-ifasto-border rounded-xl bg-white px-3 py-1.5 w-fit">
+            <div className="flex items-center gap-5">
               <button
                 onClick={() => void bumpQueueCount(-1)}
-                className="w-14 h-14 rounded-lg text-3xl text-ifasto-text active:bg-ifasto-bg"
+                className="w-16 h-16 rounded-xl border border-ifasto-border text-3xl text-ifasto-text active:bg-ifasto-bg"
               >
                 –
               </button>
-              <span className="text-4xl font-semibold tabular-nums w-14 text-center">
+              <span className="text-6xl font-semibold tabular-nums w-20 text-center leading-none">
                 {settings.manual_queue_count}
               </span>
               <button
                 onClick={() => void bumpQueueCount(1)}
-                className="w-14 h-14 rounded-lg text-3xl text-ifasto-text active:bg-ifasto-bg"
+                className="w-16 h-16 rounded-xl border border-ifasto-border text-3xl text-ifasto-text active:bg-ifasto-bg"
               >
                 +
               </button>
             </div>
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="shrink-0 px-4 py-3 text-sm border border-ifasto-border rounded-md hover:border-ifasto-text transition-colors"
-          >
-            {t.ops.addParty}
-          </button>
+
+          {/* Card 2: passes + revenue + sell */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white border border-ifasto-border rounded-xl px-4 py-3 flex flex-col justify-center">
+              <p className="text-[11px] font-mono uppercase tracking-widest text-ifasto-secondary">
+                {t.ops.tilePremium}
+              </p>
+              <p className="font-display text-3xl mt-1 tabular-nums">
+                {state?.premium_waiting ?? premium.length}
+                <span className="text-lg text-ifasto-secondary">/{allowedPasses(state?.total_waiting ?? 0)}</span>
+              </p>
+            </div>
+            <div className="bg-white border border-ifasto-border rounded-xl px-4 py-3 flex flex-col justify-center">
+              <p className="text-[11px] font-mono uppercase tracking-widest text-ifasto-secondary">
+                {t.ops.tilePremiumToday}
+              </p>
+              <p className="font-display text-3xl mt-1 tabular-nums text-ifasto-amber">
+                {formatYen(state?.premium_revenue_today ?? 0)}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="col-span-2 py-3.5 rounded-xl text-sm font-medium border border-ifasto-border bg-white hover:border-ifasto-text transition-colors"
+            >
+              {t.ops.addParty}
+            </button>
+          </div>
         </section>
       )}
 
@@ -711,7 +719,13 @@ function EntryRow({
   const waited = waitedMinutes(entry.joined_at);
   const pendingPay = entry.premium_pending_until != null;
   return (
-    <li className="px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4">
+    <li
+      className={
+        pendingPay
+          ? "px-4 sm:px-6 py-3.5 flex items-center gap-3 sm:gap-4 bg-amber-50 border-l-4 border-amber-400"
+          : "px-4 sm:px-6 py-3.5 flex items-center gap-3 sm:gap-4"
+      }
+    >
       <span className="font-mono text-base font-bold text-ifasto-text w-12 shrink-0 tabular-nums">
         {entry.ticket_no != null ? t.ops.ticket(entry.ticket_no) : position}
       </span>
