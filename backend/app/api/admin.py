@@ -8,6 +8,8 @@ reasoning as reports.py — pilot volumes are tiny.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
 
@@ -97,7 +99,18 @@ async def overview(
         row["ifasto_fee_today"] += tx.ifasto_fee
 
     rows = sorted(by_venue.values(), key=lambda r: r["name"].lower())
+
+    # Latest daily deep-check result (written by system_check.py via cron).
+    system_check = None
+    try:
+        p = Path(__file__).resolve().parents[2] / "system_check_result.json"
+        if p.exists():
+            system_check = json.loads(p.read_text())
+    except Exception:
+        system_check = None
+
     return {
+        "system_check": system_check,
         "date_jst": datetime.now(JST).date().isoformat(),
         "venues": rows,
         "totals": {

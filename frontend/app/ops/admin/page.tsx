@@ -27,7 +27,14 @@ interface VenueRow {
   last_activity: string | null;
 }
 
+interface SystemCheck {
+  ts: string;
+  pass: boolean;
+  failed: string[];
+}
+
 interface Overview {
+  system_check: SystemCheck | null;
   date_jst: string;
   venues: VenueRow[];
   totals: {
@@ -105,6 +112,19 @@ export default function AdminPage() {
 
       {data && (
         <>
+          {data.system_check && (
+            <div
+              className={`mb-6 rounded-lg border px-4 py-3 text-sm font-medium ${
+                data.system_check.pass
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-red-50 border-red-300 text-red-800"
+              }`}
+            >
+              {data.system_check.pass
+                ? `System ready — all checks passed (${new Date(data.system_check.ts).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })})`
+                : `System check FAILED: ${data.system_check.failed.join(", ")} (${new Date(data.system_check.ts).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })})`}
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             {[
               ["Waiting now", String(data.totals.waiting_now)],
